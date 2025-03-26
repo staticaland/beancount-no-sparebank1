@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/staticaland/beancount-no-sparebank1/compare/v0.1.0...v0.2.0) (2025-03-26)
+
+
+### Features
+
+* Refactor and add better categorization etc ([af9ce55](https://github.com/staticaland/beancount-no-sparebank1/commit/af9ce55b6b0f7187b5948ee87abce4278b4cedbf))
+
 ## 0.1.0 (2025-03-25)
 
 
