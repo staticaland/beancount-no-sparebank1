@@ -53,7 +53,7 @@ class PDFStatementImporter(Importer):
         self.dedup_window = datetime.timedelta(days=dedup_window_days)
         self.dedup_max_date_delta = datetime.timedelta(days=dedup_max_date_delta)
         self.dedup_epsilon = dedup_epsilon
-        self.logger = logging.getLogger('PDFStatementImporter')
+        self.logger = logging.getLogger("PDFStatementImporter")
 
     def identify(self, filepath: str) -> bool:
         """
@@ -73,11 +73,11 @@ class PDFStatementImporter(Importer):
         norwegian_patterns = [
             r"Kontoutskrift",
             r"Saldo.*favør",
-            r"perioden\s+\d{2}\.\d{2}\.\d{4}\s+-\s+\d{2}\.\d{2}\.\d{4}"
+            r"perioden\s+\d{2}\.\d{2}\.\d{4}\s+-\s+\d{2}\.\d{2}\.\d{4}",
         ]
 
         try:
-            with path.open('rb') as f:
+            with path.open("rb") as f:
                 pdf = pypdf.PdfReader(f)
                 return len(pdf.pages) > 0 and any(
                     re.search(pattern, pdf.pages[0].extract_text())
@@ -122,7 +122,7 @@ class PDFStatementImporter(Importer):
 
         try:
             # Extract text from the full PDF
-            with open(filepath, 'rb') as f:
+            with open(filepath, "rb") as f:
                 pdf = pypdf.PdfReader(f)
                 if len(pdf.pages) == 0:
                     return entries
@@ -142,8 +142,12 @@ class PDFStatementImporter(Importer):
                     # Set balance date to the day AFTER the statement end date
                     balance_date = end_date + datetime.timedelta(days=1)
 
-                    self.logger.info(f"Found balance {balance} {self.currency} as of {end_date}")
-                    self.logger.info(f"Setting balance assertion date to {balance_date}")
+                    self.logger.info(
+                        f"Found balance {balance} {self.currency} as of {end_date}"
+                    )
+                    self.logger.info(
+                        f"Setting balance assertion date to {balance_date}"
+                    )
 
                     # Create exactly one balance directive
                     meta = data.new_metadata(filepath, 1)
@@ -156,16 +160,22 @@ class PDFStatementImporter(Importer):
                         account=self.account_name,
                         amount=amount,
                         tolerance=None,
-                        diff_amount=None
+                        diff_amount=None,
                     )
 
                     entries.append(entry)
-                    self.logger.info(f"Created 1 balance assertion for {self.account_name}")
+                    self.logger.info(
+                        f"Created 1 balance assertion for {self.account_name}"
+                    )
                 else:
                     if not end_date:
-                        self.logger.warning(f"Could not extract end date from {filepath}")
+                        self.logger.warning(
+                            f"Could not extract end date from {filepath}"
+                        )
                     if not balance:
-                        self.logger.warning(f"Could not extract balance from {filepath}")
+                        self.logger.warning(
+                            f"Could not extract balance from {filepath}"
+                        )
 
             # Mark duplicates if we have existing entries
             if existing_entries and entries:
@@ -204,7 +214,9 @@ class PDFStatementImporter(Importer):
             The latest end date as a datetime.date object or None if not found.
         """
         # Find all period matches
-        period_matches = re.finditer(r'perioden\s+\d{2}\.\d{2}\.\d{4}\s+-\s+(\d{2}\.\d{2}\.\d{4})', text)
+        period_matches = re.finditer(
+            r"perioden\s+\d{2}\.\d{2}\.\d{4}\s+-\s+(\d{2}\.\d{2}\.\d{4})", text
+        )
 
         latest_date = None
 
@@ -212,7 +224,7 @@ class PDFStatementImporter(Importer):
             date_str = match.group(1)
             try:
                 # Parse Norwegian date format (DD.MM.YYYY)
-                day, month, year = map(int, date_str.split('.'))
+                day, month, year = map(int, date_str.split("."))
                 current_date = datetime.date(year, month, day)
 
                 if latest_date is None or current_date > latest_date:
@@ -234,10 +246,10 @@ class PDFStatementImporter(Importer):
         """
         # Try different balance patterns
         balance_patterns = [
-            r'SaldoiDeresfavør\s*([\d.,]+)',
-            r'Saldo\s+i\s+Deres\s+favør\s*([\d.,]+)',
-            r'Saldo.*?(\d[\d.,]+)',
-            r'Saldo\s+kr\s*([\d.,]+)'
+            r"SaldoiDeresfavør\s*([\d.,]+)",
+            r"Saldo\s+i\s+Deres\s+favør\s*([\d.,]+)",
+            r"Saldo.*?(\d[\d.,]+)",
+            r"Saldo\s+kr\s*([\d.,]+)",
         ]
 
         # Find all balance matches
@@ -247,7 +259,7 @@ class PDFStatementImporter(Importer):
             matches = re.finditer(pattern, text)
             for match in matches:
                 # Handle Norwegian number format (replace comma with period)
-                balance = match.group(1).replace('.', '').replace(',', '.')
+                balance = match.group(1).replace(".", "").replace(",", ".")
                 all_balances.append(balance)
 
         # Return the last balance found (most likely the final balance)

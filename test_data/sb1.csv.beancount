@@ -6,31 +6,31 @@
   to_account: "65432198765"
   from_account: "12345678901"
   Assets:Bank:SpareBank1:Checking  -11300.00 NOK
-  Assets:Bank:SpareBank1:Checking   11300.00 NOK
+  Expenses:Uncategorized            11300.00 NOK
 
 2025-02-02 * "Overføring fra Maria"
   to_account: "12345678901"
   from_account: "45612378901"
   Assets:Bank:SpareBank1:Checking   2500.00 NOK
-  Assets:Bank:SpareBank1:Transfer  -2500.00 NOK
+  Income:Uncategorized             -2500.00 NOK
 
 2025-02-03 * "OBS BYGG LILLESTRØM"
   to_account: "78901234567"
   from_account: "12345678901"
   Assets:Bank:SpareBank1:Checking  -4325.90 NOK
-  Assets:Bank:SpareBank1:Checking   4325.90 NOK
+  Expenses:Uncategorized            4325.90 NOK
 
 2025-02-05 * "GET/TELIA"
   to_account: "34512389012"
   from_account: "12345678901"
   Assets:Bank:SpareBank1:Checking  -629.00 NOK
-  Assets:Bank:SpareBank1:Checking   629.00 NOK
+  Expenses:Uncategorized            629.00 NOK
 
 2025-02-07 * "SKATTEETATEN"
   to_account: "12345678901"
   from_account: "99988877766"
   Assets:Bank:SpareBank1:Checking   2187.00 NOK
-  Assets:Bank:SpareBank1:Checking  -2187.00 NOK
+  Income:Uncategorized             -2187.00 NOK
 
 2025-02-10 * "VINMONOPOLET OSLO S"
   to_account: "89123456789"
@@ -42,7 +42,7 @@
   to_account: "34567812390"
   from_account: "12345678901"
   Assets:Bank:SpareBank1:Checking  -1249.00 NOK
-  Assets:Bank:SpareBank1:Checking   1249.00 NOK
+  Expenses:Uncategorized            1249.00 NOK
 
 2025-02-14 * "Lønn KOMPLETT AS"
   to_account: "12345678901"
@@ -54,13 +54,13 @@
   to_account: "23489156123"
   from_account: "12345678901"
   Assets:Bank:SpareBank1:Checking  -723.45 NOK
-  Assets:Bank:SpareBank1:Checking   723.45 NOK
+  Expenses:Uncategorized            723.45 NOK
 
 2025-02-18 * "FINN.NO FAKTURA"
   to_account: "87654321987"
   from_account: "12345678901"
   Assets:Bank:SpareBank1:Checking  -89.00 NOK
-  Assets:Bank:SpareBank1:Checking   89.00 NOK
+  Expenses:Uncategorized            89.00 NOK
 
 2025-02-20 * "MENY BOGSTADVEIEN"
   to_account: "23451298765"
@@ -72,22 +72,22 @@
   to_account: "56712389012"
   from_account: "12345678901"
   Assets:Bank:SpareBank1:Checking  -3799.00 NOK
-  Assets:Bank:SpareBank1:Checking   3799.00 NOK
+  Expenses:Uncategorized            3799.00 NOK
 
 2025-02-25 * "RUTER MÅNEDSKORT"
   to_account: "34567891234"
   from_account: "12345678901"
   Assets:Bank:SpareBank1:Checking  -814.00 NOK
-  Assets:Bank:SpareBank1:Checking   814.00 NOK
+  Expenses:Uncategorized            814.00 NOK
 
 2025-02-26 * "Overføring til Sparekonto"
   to_account: "98712345678"
   from_account: "12345678901"
   Assets:Bank:SpareBank1:Checking  -5000.00 NOK
-  Assets:Bank:SpareBank1:Transfer   5000.00 NOK
+  Assets:Bank:SpareBank1:Savings    5000.00 NOK
 
 2025-02-28 * "KIWI MAJORSTUEN"
   to_account: "12345678901"
   from_account: "98765432109"
   Assets:Bank:SpareBank1:Checking  -348.56 NOK
-  Expenses:Groceries                348.56 NOK
+  Assets:Bank:SpareBank1:Checking   348.56 NOK

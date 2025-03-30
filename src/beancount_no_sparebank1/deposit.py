@@ -8,6 +8,8 @@ from beancount.core import data
 from beancount.core.amount import Amount
 from beangulp import extract, similar, utils
 from beangulp.importers.csvbase import Column, CreditOrDebit, Date, Importer
+from beangulp.testing import main as test_main
+
 
 DIALECT_NAME = "sparebank1"
 
@@ -36,17 +38,51 @@ class DepositAccountImporter(Importer):
 
     amount = CreditOrDebit(
         subs={
-            ",": ".",   # Convert decimal separator
-            "-": ""     # Remove negative signs
+            ",": ".",  # Convert decimal separator
+            "-": "",  # Remove negative signs
         },
-        credit="Inn",   # Values in this column are KEPT AS-IS
-        debit="Ut"      # Values in this column are NEGATED
+        credit="Inn",  # Values in this column are KEPT AS-IS
+        debit="Ut",  # Values in this column are NEGATED
     )
 
     # Map the metadata fields
     rentedato = Column("Rentedato")
     til_konto = Column("Til konto")
     fra_konto = Column("Fra konto")
+
+    def account(self, filepath: str) -> str:
+        """
+        Determine the account based on the first transaction in the CSV file.
+
+        Args:
+            filepath: Path to the CSV file.
+
+        Returns:
+            The Beancount account name for this CSV file.
+        """
+        with open(filepath, "r", encoding=self.encoding) as f:
+            reader = csv.DictReader(f, dialect=self.dialect)
+            first_row = next(reader, None)
+
+            if not first_row:
+                return self.importer_account
+
+            # Check if it's an incoming transaction (if Inn is not empty)
+            inn_amount = first_row.get("Inn", "").strip()
+
+            # Get our account number based on direction
+            if inn_amount:  # Incoming transaction
+                account_number = first_row.get("Fra konto", "").strip()
+            else:  # Outgoing transaction
+                account_number = first_row.get("Til konto", "").strip()
+
+            # Look up account in mappings
+            for pattern, account in self.account_number_to_account_mappings:
+                if pattern == account_number:
+                    return account
+
+            # If no mapping found, return the default account
+            return self.importer_account
 
     def __init__(
         self,
@@ -55,6 +91,7 @@ class DepositAccountImporter(Importer):
         narration_to_account_mappings: Optional[Sequence[Tuple[str, str]]] = None,
         account_number_to_account_mappings: Optional[Sequence[Tuple[str, str]]] = None,
         default_expense_account: str = "Expenses:Uncategorized",
+        default_income_account: str = "Income:Uncategorized",
         dedup_window_days: int = 3,
         dedup_max_date_delta: int = 2,
         dedup_epsilon: Decimal = Decimal("0.05"),
@@ -70,7 +107,8 @@ class DepositAccountImporter(Importer):
                 to map narration patterns to accounts for categorization.
             account_number_to_account_mappings: Optional list of (account_number, account) tuples
                 to map account numbers to Beancount accounts for categorization.
-            default_expense_account: Default account to use when no mapping matches (default: "Expenses:Uncategorized").
+            default_expense_account: Default account to use for outgoing transactions when no mapping matches.
+            default_income_account: Default account to use for incoming transactions when no mapping matches.
             flag: Transaction flag (default: "*").
             dedup_window_days: Days to look back for duplicates.
             dedup_max_date_delta: Max days difference for duplicate detection.
@@ -78,8 +116,11 @@ class DepositAccountImporter(Importer):
         """
 
         self.narration_to_account_mappings = narration_to_account_mappings or []
-        self.account_number_to_account_mappings = account_number_to_account_mappings or []
+        self.account_number_to_account_mappings = (
+            account_number_to_account_mappings or []
+        )
         self.default_expense_account = default_expense_account
+        self.default_income_account = default_income_account
         self.dedup_window = datetime.timedelta(days=dedup_window_days)
         self.dedup_max_date_delta = datetime.timedelta(days=dedup_max_date_delta)
         self.dedup_epsilon = dedup_epsilon
@@ -158,16 +199,15 @@ class DepositAccountImporter(Importer):
 
     def finalize(self, txn: data.Transaction, row: Any) -> Optional[data.Transaction]:
         """
-        Post-process the transaction with categorization based on narration
-        or account numbers.
+        Post-process the transaction with categorization based on account numbers
+        and narration patterns.
 
         Mapping precedence:
-        1. Narration patterns are checked first
-        2. Account numbers are checked second (from_account and to_account)
-        3. Default expense account is used if no match is found
-
-        Only the first matching pattern in each category is applied. Once a match
-        is found in any category, the categorization stops and that account is used.
+        1. Account number mappings (direction-aware):
+        - For outgoing transactions: check til_konto (destination)
+        - For incoming transactions: check fra_konto (source)
+        2. Narration patterns
+        3. Default accounts based on transaction direction
 
         Args:
             txn: The transaction object to finalize.
@@ -177,64 +217,88 @@ class DepositAccountImporter(Importer):
             The modified transaction, or None if invalid.
         """
         if not txn.postings:
-            return txn  # No changes if no postings
+            return txn
 
-        # Check narration patterns first (highest precedence)
-        for pattern, account in self.narration_to_account_mappings:
-            if pattern in txn.narration:
-                opposite_units = Amount(-txn.postings[0].units.number, self.currency)
-                balancing_posting = data.Posting(
-                    account, opposite_units, None, None, None, None
-                )
-                # Return immediately on first match
-                return txn._replace(postings=txn.postings + [balancing_posting])
-                
-        # Check account number patterns second
+        amount = txn.postings[0].units.number
         from_account = getattr(row, "fra_konto", "")
         to_account = getattr(row, "til_konto", "")
-        
-        # Check both from_account and to_account against the mappings
-        for account_number in [from_account, to_account]:
-            if account_number:
-                for pattern, account in self.account_number_to_account_mappings:
-                    if pattern in account_number:
-                        opposite_units = Amount(-txn.postings[0].units.number, self.currency)
-                        balancing_posting = data.Posting(
-                            account, opposite_units, None, None, None, None
-                        )
-                        # Return immediately on first match
-                        return txn._replace(postings=txn.postings + [balancing_posting])
-                    
-        # If no patterns matched, use the default expense account
-        opposite_units = Amount(-txn.postings[0].units.number, self.currency)
+
+        # Check account number mappings first
+        if amount < 0 and to_account:  # Outgoing
+            for pattern, account in self.account_number_to_account_mappings:
+                if pattern == to_account:
+                    opposite_units = Amount(-amount, self.currency)
+                    balancing_posting = data.Posting(
+                        account=account,
+                        units=opposite_units,
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None,
+                    )
+                    return txn._replace(postings=txn.postings + [balancing_posting])
+        elif amount > 0 and from_account:  # Incoming
+            for pattern, account in self.account_number_to_account_mappings:
+                if pattern == from_account:
+                    opposite_units = Amount(-amount, self.currency)
+                    balancing_posting = data.Posting(
+                        account=account,
+                        units=opposite_units,
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None,
+                    )
+                    return txn._replace(postings=txn.postings + [balancing_posting])
+
+        # Then check narration patterns
+        for pattern, account in self.narration_to_account_mappings:
+            if pattern in txn.narration:
+                opposite_units = Amount(-amount, self.currency)
+                balancing_posting = data.Posting(
+                    account=account,
+                    units=opposite_units,
+                    cost=None,
+                    price=None,
+                    flag=None,
+                    meta=None,
+                )
+                return txn._replace(postings=txn.postings + [balancing_posting])
+
+        # Finally, use default accounts
+        default_account = (
+            self.default_income_account if amount > 0 else self.default_expense_account
+        )
+        opposite_units = Amount(-amount, self.currency)
         balancing_posting = data.Posting(
-            self.default_expense_account, opposite_units, None, None, None, None
+            account=default_account,
+            units=opposite_units,
+            cost=None,
+            price=None,
+            flag=None,
+            meta=None,
         )
         return txn._replace(postings=txn.postings + [balancing_posting])
 
 
-from beangulp.testing import main as test_main
-
-
 def main():
-    """Entry point for the command-line interface."""
-    # This enables the testing CLI commands
-    test_main(DepositAccountImporter(
-        'Assets:Bank:SpareBank1:Checking',
-        account_number_to_account_mappings=[
-            ('12345678901', 'Assets:Bank:SpareBank1:Checking'),
-            ('98712345678', 'Assets:Bank:SpareBank1:Savings')
-        ],
-        narration_to_account_mappings=[
-            ('Lønn', 'Income:Salary'),
-            ('KIWI', 'Expenses:Groceries'),
-            ('MENY', 'Expenses:Groceries'),
-            ('VINMONOPOLET', 'Expenses:Alcohol'),
-            ('Overføring', 'Assets:Bank:SpareBank1:Transfer')
-        ],
-        default_expense_account='Expenses:Uncategorized'
-    ))
+    test_main(
+        DepositAccountImporter(
+            account_number_to_account_mappings=[
+                ("12345678901", "Assets:Bank:SpareBank1:Checking"),
+                ("98712345678", "Assets:Bank:SpareBank1:Savings"),
+                ("56712345678", "Income:Salary"),
+            ],
+            narration_to_account_mappings=[
+                ("KIWI", "Expenses:Groceries"),
+                ("MENY", "Expenses:Groceries"),
+                ("VINMONOPOLET", "Expenses:Alcohol"),
+            ],
+            default_expense_account="Expenses:Uncategorized",
+            default_income_account="Income:Uncategorized",
+        )
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
