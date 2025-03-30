@@ -2,8 +2,9 @@ import csv
 import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, TypedDict
+from typing import Any, Dict, List, Optional, Tuple
 import itertools
+from dataclasses import dataclass, field
 
 from beancount.core import data
 from beancount.core.amount import Amount
@@ -17,14 +18,17 @@ DIALECT_NAME = "sparebank1"
 csv.register_dialect(DIALECT_NAME, delimiter=";")
 
 
-class Sparebank1AccountConfig(TypedDict):
+@dataclass
+class Sparebank1AccountConfig:
+    """Configuration for a SpareBank 1 account."""
+
     primary_account_number: str
     account_name: str
     currency: str
-    other_account_mappings: List[Tuple[str, str]]
-    narration_to_account_mappings: List[Tuple[str, str]]
-    default_expense_account: str
-    default_income_account: str
+    other_account_mappings: List[Tuple[str, str]] = field(default_factory=list)
+    narration_to_account_mappings: List[Tuple[str, str]] = field(default_factory=list)
+    default_expense_account: str = "Expenses:Unknown"
+    default_income_account: str = "Income:Unknown"
 
 
 class DepositAccountImporter(Importer):
@@ -94,29 +98,23 @@ class DepositAccountImporter(Importer):
         flag: str = "*",
     ):
         """
-        Initialize a SpareBank 1 importer using a configuration dictionary.
+        Initialize a SpareBank 1 importer using a configuration object.
 
         Args:
-            config: A dictionary containing account-specific configuration.
+            config: A Sparebank1AccountConfig object with account details.
             flag: Transaction flag (default: "*").
             dedup_window_days: Days to look back for duplicates.
             dedup_max_date_delta: Max days difference for duplicate detection.
             dedup_epsilon: Tolerance for amount differences in duplicates.
         """
-        # Store configuration values
-        self.primary_account_number = config["primary_account_number"]
-        account_name = config["account_name"]  # Local var for super init
-        self.currency = config["currency"]
-        self.other_account_mappings = config.get("other_account_mappings", [])
-        self.narration_to_account_mappings = config.get(
-            "narration_to_account_mappings", []
-        )
-        self.default_expense_account = config.get(
-            "default_expense_account", "Expenses:Unknown"
-        )
-        self.default_income_account = config.get(
-            "default_income_account", "Income:Unknown"
-        )
+        # Store configuration values using attribute access
+        self.primary_account_number = config.primary_account_number
+        account_name = config.account_name  # Local var for super init
+        self.currency = config.currency
+        self.other_account_mappings = config.other_account_mappings
+        self.narration_to_account_mappings = config.narration_to_account_mappings
+        self.default_expense_account = config.default_expense_account
+        self.default_income_account = config.default_income_account
 
         # Store deduplication settings
         self.dedup_window = datetime.timedelta(days=dedup_window_days)
@@ -242,9 +240,7 @@ class DepositAccountImporter(Importer):
         and narration patterns.
 
         Mapping precedence:
-        1. Account number mappings (direction-aware):
-        - For outgoing transactions: check til_konto (destination)
-        - For incoming transactions: check fra_konto (source)
+        1. Account number mappings (direction-aware)
         2. Narration patterns
         3. Default accounts based on transaction direction
 
@@ -256,97 +252,85 @@ class DepositAccountImporter(Importer):
             The modified transaction, or None if invalid.
         """
         if not txn.postings:
+            # Return original txn if no postings (or handle as error if needed)
             return txn
 
         amount = txn.postings[0].units.number
         from_account = getattr(row, "fra_konto", "")
         to_account = getattr(row, "til_konto", "")
+        narration = txn.narration  # Get narration from transaction
 
-        # Check account number mappings first (using other_account_mappings now)
-        if amount < 0 and to_account:  # Outgoing transaction, check destination account
-            for (
-                pattern,
-                account,
-            ) in self.other_account_mappings:
-                if pattern == to_account:
-                    opposite_units = Amount(-amount, self.currency)
-                    balancing_posting = data.Posting(
-                        account=account,
-                        units=opposite_units,
-                        cost=None,
-                        price=None,
-                        flag=None,
-                        meta=None,
-                    )
-                    return txn._replace(postings=txn.postings + [balancing_posting])
-        elif amount > 0 and from_account:  # Incoming transaction, check source account
-            for (
-                pattern,
-                account,
-            ) in self.other_account_mappings:
-                if pattern == from_account:
-                    opposite_units = Amount(-amount, self.currency)
-                    balancing_posting = data.Posting(
-                        account=account,
-                        units=opposite_units,
-                        cost=None,
-                        price=None,
-                        flag=None,
-                        meta=None,
-                    )
-                    return txn._replace(postings=txn.postings + [balancing_posting])
+        balancing_account = None
 
-        # Then check narration patterns (using narration_to_account_mappings)
-        for (
-            pattern,
-            account,
-        ) in self.narration_to_account_mappings:
-            if pattern in txn.narration:
-                opposite_units = Amount(-amount, self.currency)
-                balancing_posting = data.Posting(
-                    account=account,
-                    units=opposite_units,
-                    cost=None,
-                    price=None,
-                    flag=None,
-                    meta=None,
-                )
-                return txn._replace(postings=txn.postings + [balancing_posting])
+        # 1. & 2. Check account number mappings (direction-aware)
+        # Determine which account number to check based on transaction direction
+        account_to_check = to_account if amount < 0 else from_account
+        if account_to_check:
+            # Use next() with a generator expression to find the first matching account mapping
+            balancing_account = next(
+                (
+                    acc  # Return the account name (acc)
+                    for pattern, acc in self.other_account_mappings  # Iterate through mappings
+                    if pattern
+                    == account_to_check  # Check if the pattern matches the account to check
+                ),
+                None,  # Default value if no match is found
+            )
 
-        # Finally, use default accounts (using default_income/expense_account)
-        default_account = (
-            self.default_income_account if amount > 0 else self.default_expense_account
-        )
-        opposite_units = Amount(-amount, self.currency)
+        # 3. Check narration patterns if no account match yet
+        if balancing_account is None and narration:
+            # Use next() with a generator expression for narration mapping
+            balancing_account = next(
+                (
+                    acc  # Return the account name (acc)
+                    for pattern, acc in self.narration_to_account_mappings  # Iterate through mappings
+                    if pattern
+                    in narration  # Check if the pattern is a substring of the narration
+                ),
+                None,  # Default value if no match is found
+            )
+
+        # 4. Use default accounts if no specific rule matched
+        if balancing_account is None:
+            # Assign default income or expense account based on amount sign
+            balancing_account = (
+                self.default_income_account
+                if amount > 0
+                else self.default_expense_account
+            )
+
+        # Create and add the single balancing posting using the determined account
         balancing_posting = data.Posting(
-            account=default_account,
-            units=opposite_units,
+            account=balancing_account,
+            units=Amount(-amount, self.currency),  # Opposite amount
             cost=None,
             price=None,
             flag=None,
             meta=None,
         )
+        # Return the transaction with the original postings plus the new balancing posting
         return txn._replace(postings=txn.postings + [balancing_posting])
 
 
 def main():
-    checking_config: Sparebank1AccountConfig = {
-        "primary_account_number": "12345678901",
-        "account_name": "Assets:Bank:SpareBank1:Checking",
-        "currency": "NOK",
-        "other_account_mappings": [
+    checking_config = Sparebank1AccountConfig(
+        primary_account_number="12345678901",
+        account_name="Assets:Bank:SpareBank1:Checking",
+        currency="NOK",
+        other_account_mappings=[
             ("98712345678", "Assets:Bank:SpareBank1:Savings"),
             ("56712345678", "Income:Salary"),
         ],
-        "narration_to_account_mappings": [
+        narration_to_account_mappings=[
             ("KIWI", "Expenses:Groceries"),
             ("MENY", "Expenses:Groceries"),
             ("VINMONOPOLET", "Expenses:Alcohol"),
             ("RUTER", "Expenses:Transport"),
         ],
-        "default_expense_account": "Expenses:Unknown",
-        "default_income_account": "Income:Unknown",
-    }
+        # Default values are handled by the dataclass, but can be overridden if needed
+        # default_expense_account="Expenses:SomethingElse",
+        # default_income_account="Income:SomethingElse",
+    )
 
     checking_importer = DepositAccountImporter(config=checking_config)
 
