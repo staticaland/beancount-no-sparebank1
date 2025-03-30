@@ -2,7 +2,8 @@ import csv
 import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TypedDict
+import itertools
 
 from beancount.core import data
 from beancount.core.amount import Amount
@@ -14,6 +15,16 @@ from beangulp.testing import main as test_main
 DIALECT_NAME = "sparebank1"
 
 csv.register_dialect(DIALECT_NAME, delimiter=";")
+
+
+class Sparebank1AccountConfig(TypedDict):
+    primary_account_number: str
+    account_name: str
+    currency: str
+    other_account_mappings: List[Tuple[str, str]]
+    narration_to_account_mappings: List[Tuple[str, str]]
+    default_expense_account: str
+    default_income_account: str
 
 
 class DepositAccountImporter(Importer):
@@ -50,112 +61,140 @@ class DepositAccountImporter(Importer):
     til_konto = Column("Til konto")
     fra_konto = Column("Fra konto")
 
+    # Instance attributes to be populated from config
+    primary_account_number: str
+    account_name: str
+    currency: str
+    other_account_mappings: List[Tuple[str, str]]
+    narration_to_account_mappings: List[Tuple[str, str]]
+    default_expense_account: str
+    default_income_account: str
+    dedup_window: datetime.timedelta
+    dedup_max_date_delta: datetime.timedelta
+    dedup_epsilon: Decimal
+
     def account(self, filepath: str) -> str:
         """
-        Determine the account based on the first transaction in the CSV file.
+        Return the configured account name for this importer instance.
 
         Args:
-            filepath: Path to the CSV file.
+            filepath: Path to the CSV file (unused, but required by base class).
 
         Returns:
-            The Beancount account name for this CSV file.
+            The Beancount account name associated with this importer configuration.
         """
-        with open(filepath, "r", encoding=self.encoding) as f:
-            reader = csv.DictReader(f, dialect=self.dialect)
-            first_row = next(reader, None)
-
-            if not first_row:
-                return self.importer_account
-
-            # Check if it's an incoming transaction (if Inn is not empty)
-            inn_amount = first_row.get("Inn", "").strip()
-
-            # Get our account number based on direction
-            if inn_amount:  # Incoming transaction
-                account_number = first_row.get("Fra konto", "").strip()
-            else:  # Outgoing transaction
-                account_number = first_row.get("Til konto", "").strip()
-
-            # Look up account in mappings
-            for pattern, account in self.account_number_to_account_mappings:
-                if pattern == account_number:
-                    return account
-
-            # If no mapping found, return the default account
-            return self.importer_account
+        return self.account_name
 
     def __init__(
         self,
-        account_name: str,
-        currency: str = "NOK",
-        narration_to_account_mappings: Optional[Sequence[Tuple[str, str]]] = None,
-        account_number_to_account_mappings: Optional[Sequence[Tuple[str, str]]] = None,
-        default_expense_account: str = "Expenses:Uncategorized",
-        default_income_account: str = "Income:Uncategorized",
+        config: Sparebank1AccountConfig,
         dedup_window_days: int = 3,
         dedup_max_date_delta: int = 2,
         dedup_epsilon: Decimal = Decimal("0.05"),
         flag: str = "*",
     ):
         """
-        Initialize a SpareBank 1 importer.
+        Initialize a SpareBank 1 importer using a configuration dictionary.
 
         Args:
-            account_name: The Beancount account name (e.g., "Assets:Bank:SpareBank1").
-            currency: The currency of the account (default: "NOK").
-            narration_to_account_mappings: Optional list of (pattern, account) tuples
-                to map narration patterns to accounts for categorization.
-            account_number_to_account_mappings: Optional list of (account_number, account) tuples
-                to map account numbers to Beancount accounts for categorization.
-            default_expense_account: Default account to use for outgoing transactions when no mapping matches.
-            default_income_account: Default account to use for incoming transactions when no mapping matches.
+            config: A dictionary containing account-specific configuration.
             flag: Transaction flag (default: "*").
             dedup_window_days: Days to look back for duplicates.
             dedup_max_date_delta: Max days difference for duplicate detection.
             dedup_epsilon: Tolerance for amount differences in duplicates.
         """
-
-        self.narration_to_account_mappings = narration_to_account_mappings or []
-        self.account_number_to_account_mappings = (
-            account_number_to_account_mappings or []
+        # Store configuration values
+        self.primary_account_number = config["primary_account_number"]
+        account_name = config["account_name"]  # Local var for super init
+        self.currency = config["currency"]
+        self.other_account_mappings = config.get("other_account_mappings", [])
+        self.narration_to_account_mappings = config.get(
+            "narration_to_account_mappings", []
         )
-        self.default_expense_account = default_expense_account
-        self.default_income_account = default_income_account
+        self.default_expense_account = config.get(
+            "default_expense_account", "Expenses:Unknown"
+        )
+        self.default_income_account = config.get(
+            "default_income_account", "Income:Unknown"
+        )
+
+        # Store deduplication settings
         self.dedup_window = datetime.timedelta(days=dedup_window_days)
         self.dedup_max_date_delta = datetime.timedelta(days=dedup_max_date_delta)
         self.dedup_epsilon = dedup_epsilon
-        super().__init__(account_name, currency, flag=flag)
+
+        # Call parent constructor AFTER storing config needed by other methods
+        super().__init__(account_name, self.currency, flag=flag)
+        # Now store account_name on self as well, consistent with other attrs
+        self.account_name = account_name
 
     def identify(self, filepath: str) -> bool:
         """
-        Identify if the file is a SpareBank 1 CSV statement.
+        Identify if the file is a SpareBank 1 CSV statement *and* belongs
+        to the primary account number configured for this importer.
 
         Args:
             filepath: Path to the file to check.
 
         Returns:
-            True if the file is a matching CSV, False otherwise.
+            True if the file is a matching CSV for this specific account, False otherwise.
         """
-
+        # Basic checks: mimetype and header
         if not utils.is_mimetype(filepath, "text/csv"):
             return False
-        return utils.search_file_regexp(
+        if not utils.search_file_regexp(
             filepath,
             "Dato;Beskrivelse;Rentedato;Inn;Ut;Til konto;Fra konto",
             encoding=self.encoding,
-        )
+        ):
+            return False
+
+        # Advanced check: verify if transactions involve the primary account number
+        try:
+            with open(filepath, "r", encoding=self.encoding) as f:
+                reader = csv.DictReader(f, dialect=self.dialect)
+                # Check the first few rows to see if our account number appears
+                # It seems 'Fra konto' is the source, 'Til konto' is the destination.
+                # For an outgoing transaction ('Ut' has value), 'Fra konto' is *our* account.
+                # For an incoming transaction ('Inn' has value), 'Til konto' is *our* account.
+                for row in itertools.islice(
+                    reader, 10
+                ):  # Check only first 10 rows for efficiency
+                    from_account = row.get("Fra konto", "").strip()
+                    to_account = row.get("Til konto", "").strip()
+                    is_outgoing = bool(
+                        row.get("Ut", "").strip()
+                    )  # Check if 'Ut' has content
+
+                    our_account_in_row = from_account if is_outgoing else to_account
+
+                    if our_account_in_row == self.primary_account_number:
+                        # Found a transaction linked to our primary account. Assume file is correct.
+                        return True
+
+                # If we checked rows and didn't find our account, it's likely not the right file.
+                # Or the file might be empty/only have header, which find_file_account handles.
+                return False
+        except (FileNotFoundError, csv.Error, Exception):
+            # Handle potential errors during file reading or CSV parsing
+            # Consider logging this instead of printing: import logging; logging.exception(...)
+            return False  # If we can't read/parse, we can't identify
 
     def filename(self, filepath: str) -> str:
         """
-        Generate a descriptive filename.
+        Generate a descriptive filename using the configured account name.
 
         Args:
             filepath: Original file path.
 
         Returns:
-            A string with account name and original filename.
+            A string with a sanitized account name and original filename.
         """
-        return f"sparebank1.{Path(filepath).name}"
+        # Sanitize account name for use in filename
+        # Use self.account_name which is set in __init__
+        account_part = self.account_name.replace(":", "-").replace(" ", "_")
+        original_filename = Path(filepath).name
+        return f"{account_part}.{original_filename}"
 
     def deduplicate(
         self, entries: List[data.Directive], existing: List[data.Directive]
@@ -223,9 +262,12 @@ class DepositAccountImporter(Importer):
         from_account = getattr(row, "fra_konto", "")
         to_account = getattr(row, "til_konto", "")
 
-        # Check account number mappings first
-        if amount < 0 and to_account:  # Outgoing
-            for pattern, account in self.account_number_to_account_mappings:
+        # Check account number mappings first (using other_account_mappings now)
+        if amount < 0 and to_account:  # Outgoing transaction, check destination account
+            for (
+                pattern,
+                account,
+            ) in self.other_account_mappings:
                 if pattern == to_account:
                     opposite_units = Amount(-amount, self.currency)
                     balancing_posting = data.Posting(
@@ -237,8 +279,11 @@ class DepositAccountImporter(Importer):
                         meta=None,
                     )
                     return txn._replace(postings=txn.postings + [balancing_posting])
-        elif amount > 0 and from_account:  # Incoming
-            for pattern, account in self.account_number_to_account_mappings:
+        elif amount > 0 and from_account:  # Incoming transaction, check source account
+            for (
+                pattern,
+                account,
+            ) in self.other_account_mappings:
                 if pattern == from_account:
                     opposite_units = Amount(-amount, self.currency)
                     balancing_posting = data.Posting(
@@ -251,8 +296,11 @@ class DepositAccountImporter(Importer):
                     )
                     return txn._replace(postings=txn.postings + [balancing_posting])
 
-        # Then check narration patterns
-        for pattern, account in self.narration_to_account_mappings:
+        # Then check narration patterns (using narration_to_account_mappings)
+        for (
+            pattern,
+            account,
+        ) in self.narration_to_account_mappings:
             if pattern in txn.narration:
                 opposite_units = Amount(-amount, self.currency)
                 balancing_posting = data.Posting(
@@ -265,7 +313,7 @@ class DepositAccountImporter(Importer):
                 )
                 return txn._replace(postings=txn.postings + [balancing_posting])
 
-        # Finally, use default accounts
+        # Finally, use default accounts (using default_income/expense_account)
         default_account = (
             self.default_income_account if amount > 0 else self.default_expense_account
         )
@@ -282,22 +330,27 @@ class DepositAccountImporter(Importer):
 
 
 def main():
-    test_main(
-        DepositAccountImporter(
-            account_number_to_account_mappings=[
-                ("12345678901", "Assets:Bank:SpareBank1:Checking"),
-                ("98712345678", "Assets:Bank:SpareBank1:Savings"),
-                ("56712345678", "Income:Salary"),
-            ],
-            narration_to_account_mappings=[
-                ("KIWI", "Expenses:Groceries"),
-                ("MENY", "Expenses:Groceries"),
-                ("VINMONOPOLET", "Expenses:Alcohol"),
-            ],
-            default_expense_account="Expenses:Uncategorized",
-            default_income_account="Income:Uncategorized",
-        )
-    )
+    checking_config: Sparebank1AccountConfig = {
+        "primary_account_number": "12345678901",
+        "account_name": "Assets:Bank:SpareBank1:Checking",
+        "currency": "NOK",
+        "other_account_mappings": [
+            ("98712345678", "Assets:Bank:SpareBank1:Savings"),
+            ("56712345678", "Income:Salary"),
+        ],
+        "narration_to_account_mappings": [
+            ("KIWI", "Expenses:Groceries"),
+            ("MENY", "Expenses:Groceries"),
+            ("VINMONOPOLET", "Expenses:Alcohol"),
+            ("RUTER", "Expenses:Transport"),
+        ],
+        "default_expense_account": "Expenses:Unknown",
+        "default_income_account": "Income:Unknown",
+    }
+
+    checking_importer = DepositAccountImporter(config=checking_config)
+
+    test_main(checking_importer)
 
 
 if __name__ == "__main__":

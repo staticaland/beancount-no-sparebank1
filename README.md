@@ -10,6 +10,10 @@ A Python library that imports Norwegian SpareBank 1 data into Beancount accounti
 - Extract balance statements from PDF account statements ("kontoutskrift")
 - Flexible transaction categorization with customizable rules
 
+## Notes
+
+- It is assumed that a file never has mixed transactions.
+
 ## Quick start
 
 ``` python
