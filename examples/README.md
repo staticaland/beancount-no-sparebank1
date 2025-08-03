@@ -5,7 +5,7 @@ This directory contains example scripts demonstrating different ways to use `bea
 ## Files
 
 ### `uv_script_example.py`
-Demonstrates the **uv script dependencies** approach using a simple external package (`requests`). This shows how the `# /// script` inline dependency declaration works with `uv run`.
+Demonstrates the **uv script dependencies** approach with `beancount-no-sparebank1`. This shows how the `# /// script` inline dependency declaration works with `uv run` to automatically install and use the package.
 
 **Usage:**
 ```bash
@@ -47,8 +47,8 @@ python examples/local_package_test.py
 
 ## Notes
 
-- `uv_script_example.py` demonstrates the uv script approach but uses a simple external dependency
-- `project_example.py` and `local_package_test.py` both use the actual `beancount-no-sparebank1` package
+- `uv_script_example.py` demonstrates the uv script approach with automatic installation of `beancount-no-sparebank1`
+- `project_example.py` and `local_package_test.py` both use the package within an existing environment
 - All scripts print information about the configured importers instead of actually running imports
 - To use these scripts for real imports, uncomment the `ingest` lines and provide actual CSV/PDF files from SpareBank 1
 - Make sure you have the necessary CSV or PDF files in your working directory when running the actual import
