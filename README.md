@@ -16,7 +16,21 @@ A Python library that imports Norwegian SpareBank 1 data into Beancount accounti
 
 ## Quick start
 
-``` python
+There are several ways to use this library. Choose the approach that best fits your workflow:
+
+### Option 1: Using uv with script dependencies (Recommended)
+
+Create a Python script with inline dependency declarations. This approach is perfect for standalone scripts:
+
+```python
+#!/usr/bin/env uv run
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "beancount-no-sparebank1",
+# ]
+# ///
+
 import beangulp
 import beancount_no_sparebank1
 
@@ -57,6 +71,56 @@ if __name__ == '__main__':
     ingest = beangulp.Ingest(importers)
     ingest()
 ```
+
+Save this as `import_sparebank1.py` and run it with:
+
+```bash
+uv run import_sparebank1.py
+```
+
+The `uv` tool will automatically create an isolated environment and install the required dependencies.
+
+### Option 2: Using uv project
+
+For more complex setups or when you want to manage multiple scripts together, create a `uv` project:
+
+```bash
+# Initialize a new uv project
+uv init my-beancount-project
+cd my-beancount-project
+
+# Add the dependency
+uv add beancount-no-sparebank1
+```
+
+This will create a `pyproject.toml` file and manage dependencies for you. Then create your import script without the dependency declarations:
+
+```python
+import beangulp
+import beancount_no_sparebank1
+
+# ... same importer configuration as above ...
+
+if __name__ == '__main__':
+    ingest = beangulp.Ingest(importers)
+    ingest()
+```
+
+Run your script with:
+
+```bash
+uv run python import_sparebank1.py
+```
+
+### Option 3: Traditional approach
+
+If you prefer using pip or other package managers:
+
+```bash
+pip install beancount-no-sparebank1
+```
+
+Then use the same Python code as in Option 2 (without the `# /// script` block).
 
 ## See also
 
