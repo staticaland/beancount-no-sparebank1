@@ -80,6 +80,8 @@ uv run import_sparebank1.py
 
 The `uv` tool will automatically create an isolated environment and install the required dependencies.
 
+You can also find a complete example in [`examples/uv_script_example.py`](examples/uv_script_example.py).
+
 ### Option 2: Using uv project
 
 For more complex setups or when you want to manage multiple scripts together, create a `uv` project:
@@ -111,6 +113,8 @@ Run your script with:
 ```bash
 uv run python import_sparebank1.py
 ```
+
+You can also find a complete example in [`examples/project_example.py`](examples/project_example.py).
 
 ### Option 3: Traditional approach
 

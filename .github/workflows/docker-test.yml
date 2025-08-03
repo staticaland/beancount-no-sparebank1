@@ -30,12 +30,12 @@ jobs:
     - name: Test uv script approach
       run: |
         echo "Testing uv script with inline dependencies..."
-        docker run --rm beancount-no-sparebank1-test python /app/test_script.py
+        docker run --rm beancount-no-sparebank1-test python /app/examples/project_example.py
         
     - name: Test uv run script directly
       run: |
         echo "Testing uv run --script approach..."
-        docker run --rm beancount-no-sparebank1-test uv run /app/test_script.py
+        docker run --rm beancount-no-sparebank1-test uv run /app/examples/uv_script_example.py
         
     - name: Test CLI help command
       run: |

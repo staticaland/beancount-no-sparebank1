@@ -22,19 +22,8 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
 
-# Create a sample script that uses the uv script dependencies approach
-RUN echo '#!/usr/bin/env -S uv run --script\n\
-# /// script\n\
-# requires-python = ">=3.12"\n\
-# dependencies = [\n\
-#     "beancount-no-sparebank1",\n\
-# ]\n\
-# ///\n\
-\n\
-import beancount_no_sparebank1\n\
-print("beancount-no-sparebank1 imported successfully!")\n\
-print("Available modules:", dir(beancount_no_sparebank1))' > /app/test_script.py && \
-    chmod +x /app/test_script.py
+# Make the example scripts executable
+RUN chmod +x /app/examples/uv_script_example.py
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
