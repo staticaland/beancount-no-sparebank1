@@ -1,0 +1,43 @@
+name: Docker Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  docker-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Docker image
+      run: |
+        docker build -t beancount-no-sparebank1-test .
+        
+    - name: Test package import and help
+      run: |
+        echo "Testing package import and help..."
+        docker run --rm beancount-no-sparebank1-test
+        
+    - name: Test uv script approach
+      run: |
+        echo "Testing uv script with inline dependencies..."
+        docker run --rm beancount-no-sparebank1-test python /app/test_script.py
+        
+    - name: Test uv run script directly
+      run: |
+        echo "Testing uv run --script approach..."
+        docker run --rm beancount-no-sparebank1-test uv run /app/test_script.py
+        
+    - name: Test CLI help command
+      run: |
+        echo "Testing CLI help command..."
+        docker run --rm beancount-no-sparebank1-test beancount-no-sparebank1 --help
