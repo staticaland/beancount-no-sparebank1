@@ -5,14 +5,14 @@ This directory contains example scripts demonstrating different ways to use `bea
 ## Files
 
 ### `uv_script_example.py`
-Demonstrates the **uv script dependencies** approach. This script includes inline dependency declarations and can be run directly with `uv run`.
+Demonstrates the **uv script dependencies** approach using a simple external package (`requests`). This shows how the `# /// script` inline dependency declaration works with `uv run`.
 
 **Usage:**
 ```bash
 # Make it executable (optional)
 chmod +x examples/uv_script_example.py
 
-# Run with uv
+# Run with uv - automatically installs dependencies
 uv run examples/uv_script_example.py
 
 # Or run directly if executable
@@ -20,7 +20,7 @@ uv run examples/uv_script_example.py
 ```
 
 ### `project_example.py`
-Demonstrates the **uv project** approach. This script doesn't include inline dependencies and should be used within a uv project.
+Demonstrates the **uv project** approach. This script uses `beancount-no-sparebank1` within a uv project environment.
 
 **Usage:**
 ```bash
@@ -36,9 +36,19 @@ cp ../examples/project_example.py .
 uv run python project_example.py
 ```
 
+### `local_package_test.py`
+Tests the actual `beancount-no-sparebank1` package functionality. This script demonstrates the complete API usage with proper configuration.
+
+**Usage:**
+```bash
+# Run in an environment where beancount-no-sparebank1 is installed
+python examples/local_package_test.py
+```
+
 ## Notes
 
-- Both examples use the same importer configuration
-- The scripts print information about the configured importers instead of actually running the import
+- `uv_script_example.py` demonstrates the uv script approach but uses a simple external dependency
+- `project_example.py` and `local_package_test.py` both use the actual `beancount-no-sparebank1` package
+- All scripts print information about the configured importers instead of actually running imports
 - To use these scripts for real imports, uncomment the `ingest` lines and provide actual CSV/PDF files from SpareBank 1
 - Make sure you have the necessary CSV or PDF files in your working directory when running the actual import

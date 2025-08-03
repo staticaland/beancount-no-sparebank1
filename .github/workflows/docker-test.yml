@@ -27,14 +27,19 @@ jobs:
         echo "Testing package import and help..."
         docker run --rm beancount-no-sparebank1-test
         
-    - name: Test uv script approach
+    - name: Test local package with project environment
       run: |
-        echo "Testing uv script with inline dependencies..."
+        echo "Testing local package with project environment..."
         docker run --rm beancount-no-sparebank1-test python /app/examples/project_example.py
         
-    - name: Test uv run script directly
+    - name: Test local package directly
       run: |
-        echo "Testing uv run --script approach..."
+        echo "Testing local package directly..."
+        docker run --rm beancount-no-sparebank1-test python /app/examples/local_package_test.py
+        
+    - name: Test uv run script approach
+      run: |
+        echo "Testing uv run --script approach with external dependencies..."
         docker run --rm beancount-no-sparebank1-test uv run /app/examples/uv_script_example.py
         
     - name: Test CLI help command

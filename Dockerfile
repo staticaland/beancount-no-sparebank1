@@ -31,6 +31,9 @@ RUN chmod +x /app/examples/uv_script_example.py
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
+# Make the virtual environment's Python packages available to uv run
+ENV PYTHONPATH="/app/.venv/lib/python3.12/site-packages:$PYTHONPATH"
+
 # Reset the entrypoint, don't invoke `uv`
 ENTRYPOINT []
 
