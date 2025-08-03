@@ -40,9 +40,7 @@ jobs:
     - name: Test uv run script approach
       run: |
         echo "Testing uv run --script approach..."
-        echo "Note: This will work once beancount-no-sparebank1 is published to PyPI"
-        echo "For now, skipping this test as the package is not yet published"
-        # docker run --rm beancount-no-sparebank1-test uv run /app/examples/uv_script_example.py
+        docker run --rm beancount-no-sparebank1-test uv run /app/examples/uv_script_example.py
         
     - name: Test CLI help command
       run: |

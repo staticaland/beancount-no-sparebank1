@@ -6,9 +6,6 @@
 # ]
 # ///
 
-# NOTE: This script will work once beancount-no-sparebank1 is published to PyPI.
-# For now, it serves as an example of how to use the uv script dependencies approach.
-
 import beangulp
 import beancount_no_sparebank1
 
