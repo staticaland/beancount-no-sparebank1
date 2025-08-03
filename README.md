@@ -23,7 +23,7 @@ There are several ways to use this library. Choose the approach that best fits y
 Create a Python script with inline dependency declarations. This approach is perfect for standalone scripts:
 
 ```python
-#!/usr/bin/env uv run
+#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
 # dependencies = [
