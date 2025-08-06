@@ -1,0 +1,38 @@
+name: Docker Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  docker-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Docker image
+      run: |
+        docker build -t beancount-no-sparebank1-test .
+        
+    - name: Test package import and help
+      run: |
+        echo "Testing package import and help..."
+        docker run --rm beancount-no-sparebank1-test
+        
+    - name: Test local package import
+      run: |
+        echo "Testing local package can be imported..."
+        docker run --rm beancount-no-sparebank1-test python -c "import beancount_no_sparebank1; print('Package imported successfully!')"
+        
+    - name: Test CLI help command
+      run: |
+        echo "Testing CLI help command..."
+        docker run --rm beancount-no-sparebank1-test beancount-no-sparebank1 --help
