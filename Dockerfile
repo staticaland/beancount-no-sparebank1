@@ -25,8 +25,7 @@ COPY . /app
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
 
-# Make the example scripts executable
-RUN chmod +x /app/examples/uv_script_example.py
+# Package is now ready for testing
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
