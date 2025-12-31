@@ -59,6 +59,7 @@ from beancount_no_sparebank1 import (
     match,
     when,
     field,
+    counterparty,
     amount,
 )
 
@@ -177,10 +178,10 @@ Open http://localhost:5000 in your browser.
 
 ## Classification API
 
-The library provides a fluent, human-readable API for transaction classification:
+The library provides a fluent, human-readable API for transaction classification, powered by [beancount-classifier](https://github.com/staticaland/beancount-classifier):
 
 ```python
-from beancount_no_sparebank1 import match, when, field, shared, amount
+from beancount_no_sparebank1 import match, when, field, counterparty, shared, amount
 
 rules = [
     # Simple substring matching
@@ -202,7 +203,12 @@ rules = [
     # Combined conditions
     match("VINMONOPOLET").where(amount > 500) >> "Expenses:Alcohol:Fine",
 
-    # Field-based matching (bank account numbers from CSV)
+    # Counterparty matching (direction-aware bank account matching)
+    # For expenses: matches to_account, for income: matches from_account
+    counterparty("98712345678") >> "Assets:Savings",
+    counterparty("56712345678") >> "Income:Salary",
+
+    # Field-based matching (explicit field matching)
     field(to_account="98712345678") >> "Assets:Savings",
     field(from_account="56712345678") >> "Income:Salary",
 
@@ -219,18 +225,37 @@ rules = [
 
 ### API Reference
 
-| Pattern Type        | Example                                       | Description                             |
-| ------------------- | --------------------------------------------- | --------------------------------------- |
-| Substring           | `match("SPOTIFY") >> "..."`                   | Matches if narration contains "SPOTIFY" |
-| Regex               | `match(r"REMA\s*1000").regex >> "..."`        | Regex pattern matching                  |
-| Case-insensitive    | `match("spotify").ignorecase >> "..."`        | Case-insensitive match                  |
-| Amount less than    | `when(amount < 50) >> "..."`                  | Amount under threshold                  |
-| Amount greater than | `when(amount > 500) >> "..."`                 | Amount over threshold                   |
-| Amount range        | `when(amount.between(100, 500)) >> "..."`     | Amount within range                     |
-| Combined            | `match("STORE").where(amount > 100) >> "..."` | Narration + amount condition            |
-| Field match         | `field(to_account="123") >> "..."`            | Match on CSV fields                     |
-| Split               | `match("X") >> [("A", 80), ("B", 20)]`        | Split across accounts                   |
-| Shared              | `... >> "X" \| shared("Receivable", 50)`      | Track shared expenses                   |
+| Pattern Type        | Example                                       | Description                                  |
+| ------------------- | --------------------------------------------- | -------------------------------------------- |
+| Substring           | `match("SPOTIFY") >> "..."`                   | Matches if narration contains "SPOTIFY"      |
+| Regex               | `match(r"REMA\s*1000").regex >> "..."`        | Regex pattern matching                       |
+| Case-insensitive    | `match("spotify").ignorecase >> "..."`        | Case-insensitive match                       |
+| Amount less than    | `when(amount < 50) >> "..."`                  | Amount under threshold                       |
+| Amount greater than | `when(amount > 500) >> "..."`                 | Amount over threshold                        |
+| Amount range        | `when(amount.between(100, 500)) >> "..."`     | Amount within range                          |
+| Combined            | `match("STORE").where(amount > 100) >> "..."` | Narration + amount condition                 |
+| Counterparty        | `counterparty("123") >> "..."`                | Direction-aware account matching (see below) |
+| Field match         | `field(to_account="123") >> "..."`            | Match on specific CSV fields                 |
+| Split               | `match("X") >> [("A", 80), ("B", 20)]`        | Split across accounts                        |
+| Shared              | `... >> "X" \| shared("Receivable", 50)`      | Track shared expenses                        |
+
+### Counterparty Matching
+
+The `counterparty()` helper provides direction-aware account matching:
+
+-   **For expenses** (amount < 0): matches against `to_account` (where money goes)
+-   **For income** (amount > 0): matches against `from_account` (where money comes from)
+
+This simplifies mapping known bank accounts:
+
+```python
+# Instead of two separate rules:
+field(to_account="98712345678").where(amount < 0) >> "Assets:Savings"
+field(from_account="98712345678").where(amount > 0) >> "Assets:Savings"
+
+# Use one counterparty rule:
+counterparty("98712345678") >> "Assets:Savings"
+```
 
 ### Available Fields
 
@@ -287,6 +312,7 @@ Sparebank1AccountConfig(
 
 ## See also
 
--   [beancount-no-amex](https://github.com/staticaland/beancount-no-amex) - American Express Norway importer (classification system origin)
+-   [beancount-classifier](https://github.com/staticaland/beancount-classifier) - The classification engine powering this importer
+-   [beancount-no-amex](https://github.com/staticaland/beancount-no-amex) - American Express Norway importer
 -   [Automatically balancing Beancount DKB transactions](https://sgoel.dev/posts/automatically-balancing-beancount-dkb-transactions/)
 -   [siddhantgoel/beancount-dkb](https://github.com/siddhantgoel/beancount-dkb)
