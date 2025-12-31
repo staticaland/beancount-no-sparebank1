@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0](https://github.com/staticaland/beancount-no-sparebank1/compare/v0.2.0...v0.3.0) (2025-12-31)
+
+
+### Features
+
+* add fluent classification API and field-based matching ([8c054b7](https://github.com/staticaland/beancount-no-sparebank1/commit/8c054b7533cb25e85e188eaa4f2337c2b27a77a5))
+* Better account detection ([a224632](https://github.com/staticaland/beancount-no-sparebank1/commit/a224632f495948248dae424f6160fa60ecbe3439))
+* Improve configuration scheme ([84123eb](https://github.com/staticaland/beancount-no-sparebank1/commit/84123ebcda8e3dca37f3e9ab9729b72b85e37f28))
+* Integrate classifier system from beancount-no-amex ([6801f47](https://github.com/staticaland/beancount-no-sparebank1/commit/6801f47c8854c883ba55691a194a1a56dc380e3f))
+* More configuration and logic improvements ([10ab1b2](https://github.com/staticaland/beancount-no-sparebank1/commit/10ab1b2cc3f3a3168de5bb468bc6c5af04f11509))
+
 ## [0.2.0](https://github.com/staticaland/beancount-no-sparebank1/compare/v0.1.0...v0.2.0) (2025-03-26)
 
 
