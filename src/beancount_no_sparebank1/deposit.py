@@ -16,6 +16,9 @@ from beancount_no_amex.classify import (
     TransactionPattern,
     TransactionClassifier,
     amount,
+    match,
+    when,
+    field,
 )
 
 
@@ -301,8 +304,15 @@ class DepositAccountImporter(Importer):
                     )
                     return txn._replace(postings=txn.postings + [balancing_posting])
 
-        # 2. Use the classifier for narration/amount-based pattern matching
-        if result := self._classifier.classify(narration, txn_amount):
+        # 2. Use the classifier for narration/amount/field-based pattern matching
+        # Build fields dict for field-based pattern matching
+        fields = {}
+        if from_account:
+            fields["from_account"] = from_account
+        if to_account:
+            fields["to_account"] = to_account
+
+        if result := self._classifier.classify(narration, txn_amount, fields if fields else None):
             return self._classifier.add_balancing_postings(txn, result)
 
         # 3. Use default accounts if no specific rule matched
@@ -333,23 +343,26 @@ def main():
             ("56712345678", "Income:Salary"),
         ],
         transaction_patterns=[
-            # Simple substring matching
-            TransactionPattern(narration="KIWI", account="Expenses:Groceries"),
-            TransactionPattern(narration="MENY", account="Expenses:Groceries"),
-            TransactionPattern(narration="VINMONOPOLET", account="Expenses:Alcohol"),
-            TransactionPattern(narration="RUTER", account="Expenses:Transport"),
-            # Regex matching example
-            TransactionPattern(
-                narration=r"REMA\s*1000",
-                regex=True,
-                account="Expenses:Groceries",
-            ),
-            # Amount-based matching example
-            TransactionPattern(
-                narration="ATM",
-                amount_condition=amount > 500,
-                account="Expenses:Cash:Large",
-            ),
+            # Fluent API - simple substring matching
+            match("KIWI") >> "Expenses:Groceries",
+            match("MENY") >> "Expenses:Groceries",
+            match("VINMONOPOLET") >> "Expenses:Alcohol",
+            match("RUTER") >> "Expenses:Transport",
+
+            # Fluent API - regex matching
+            match(r"REMA\s*1000").regex >> "Expenses:Groceries",
+
+            # Fluent API - case-insensitive
+            match("spotify").ignorecase >> "Expenses:Subscriptions",
+
+            # Fluent API - amount condition with narration
+            match("ATM").where(amount > 500) >> "Expenses:Cash:Large",
+
+            # Fluent API - amount-only matching
+            when(amount < 50) >> "Expenses:PettyCash",
+
+            # Fluent API - field-based matching (matches bank account numbers)
+            field(to_account="11112222333") >> "Assets:Bank:SpareBank1:Savings",
         ],
         # Default values are handled by the dataclass, but can be overridden if needed
         # default_expense_account="Expenses:SomethingElse",

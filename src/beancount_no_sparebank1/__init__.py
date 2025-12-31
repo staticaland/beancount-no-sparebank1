@@ -10,4 +10,9 @@ from beancount_no_amex.classify import (  # NOQA
     AmountCondition,
     AmountOperator,
     amount,
+    # Fluent API for human-readable pattern definitions
+    match,
+    when,
+    field,
+    shared,
 )
