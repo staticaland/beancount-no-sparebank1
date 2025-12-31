@@ -12,7 +12,7 @@ from beangulp import extract, similar, utils
 from beangulp.importers.csvbase import Column, CreditOrDebit, Date, Importer
 from beangulp.testing import main as test_main
 
-from beancount_no_amex.classify import (
+from beancount_classifier import (
     TransactionPattern,
     TransactionClassifier,
     amount,
