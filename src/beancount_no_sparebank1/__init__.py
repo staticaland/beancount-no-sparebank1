@@ -15,4 +15,5 @@ from beancount_classifier import (  # NOQA
     when,
     field,
     shared,
+    counterparty,
 )

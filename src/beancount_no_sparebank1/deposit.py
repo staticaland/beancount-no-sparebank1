@@ -15,10 +15,12 @@ from beangulp.testing import main as test_main
 from beancount_classifier import (
     TransactionPattern,
     TransactionClassifier,
+    ClassifierMixin,
     amount,
     match,
     when,
     field,
+    counterparty,
 )
 
 
@@ -52,13 +54,18 @@ class Sparebank1AccountConfig:
     default_income_account: str = "Income:Unknown"
 
 
-class DepositAccountImporter(Importer):
+class DepositAccountImporter(ClassifierMixin, Importer):
     """
     Importer for SpareBank 1 deposit account CSV statements.
 
     This importer processes CSV statements from SpareBank 1 in Norway, handling
     Norwegian date and decimal formats, and categorizing transactions based on
     narration patterns.
+
+    Uses ClassifierMixin for transaction categorization with:
+    - Pattern-based matching (narration, amount, fields)
+    - Counterparty matching (bank account numbers)
+    - Direction-aware defaults (separate income/expense accounts)
     """
 
     # Configure csvbase options
@@ -90,14 +97,12 @@ class DepositAccountImporter(Importer):
     primary_account_number: str
     account_name: str
     currency: str
-    other_account_mappings: List[Tuple[str, str]]
-    transaction_patterns: List[TransactionPattern]
-    default_expense_account: str
-    default_income_account: str
+    transaction_patterns: List[TransactionPattern]  # Used by ClassifierMixin
+    default_expense: str  # Used by ClassifierMixin (direction-aware)
+    default_income: str   # Used by ClassifierMixin (direction-aware)
     dedup_window: datetime.timedelta
     dedup_max_date_delta: datetime.timedelta
     dedup_epsilon: Decimal
-    _classifier: TransactionClassifier
 
     def account(self, filepath: str) -> str:
         """
@@ -133,16 +138,18 @@ class DepositAccountImporter(Importer):
         self.primary_account_number = config.primary_account_number
         account_name = config.account_name  # Local var for super init
         self.currency = config.currency
-        self.other_account_mappings = config.other_account_mappings
-        self.transaction_patterns = config.transaction_patterns
-        self.default_expense_account = config.default_expense_account
-        self.default_income_account = config.default_income_account
 
-        # Create the transaction classifier for narration-based matching
-        self._classifier = TransactionClassifier(
-            patterns=self.transaction_patterns,
-            default_account=None,  # We handle defaults separately based on direction
-        )
+        # Build transaction patterns: counterparty mappings + user patterns
+        # Counterparty patterns come first (highest priority for known accounts)
+        counterparty_patterns = [
+            counterparty(acct_num) >> beancount_acct
+            for acct_num, beancount_acct in config.other_account_mappings
+        ]
+        self.transaction_patterns = counterparty_patterns + list(config.transaction_patterns)
+
+        # ClassifierMixin uses these for direction-aware defaults
+        self.default_expense = config.default_expense_account
+        self.default_income = config.default_income_account
 
         # Store deduplication settings
         self.dedup_window = datetime.timedelta(days=dedup_window_days)
@@ -262,75 +269,28 @@ class DepositAccountImporter(Importer):
         # Filter out None values to keep metadata clean
         return {k: v for k, v in meta.items() if v != ""}
 
-    def finalize(self, txn: data.Transaction, row: Any) -> Optional[data.Transaction]:
+    def get_fields(self, row: Any) -> Dict[str, str] | None:
         """
-        Post-process the transaction with categorization based on account numbers
-        and narration patterns using the classifier system.
+        Extract fields from the CSV row for pattern matching.
 
-        Mapping precedence:
-        1. Account number mappings (direction-aware)
-        2. TransactionPattern matching via classifier (narration/amount based)
-        3. Default accounts based on transaction direction
+        Used by ClassifierMixin for field-based and counterparty matching.
 
         Args:
-            txn: The transaction object to finalize.
             row: The row object from the CSV.
 
         Returns:
-            The modified transaction, or None if invalid.
+            Dictionary with from_account and to_account fields.
         """
-        if not txn.postings:
-            return txn
-
-        txn_amount = txn.postings[0].units.number
+        fields = {}
         from_account = getattr(row, "fra_konto", "")
         to_account = getattr(row, "til_konto", "")
-        narration = txn.narration or ""
 
-        # 1. Check account number mappings (direction-aware)
-        # Determine which account number to check based on transaction direction
-        account_to_check = to_account if txn_amount < 0 else from_account
-        if account_to_check:
-            for pattern, acc in self.other_account_mappings:
-                if pattern == account_to_check:
-                    # Found a match via bank account number
-                    balancing_posting = data.Posting(
-                        account=acc,
-                        units=Amount(-txn_amount, self.currency),
-                        cost=None,
-                        price=None,
-                        flag=None,
-                        meta=None,
-                    )
-                    return txn._replace(postings=txn.postings + [balancing_posting])
-
-        # 2. Use the classifier for narration/amount/field-based pattern matching
-        # Build fields dict for field-based pattern matching
-        fields = {}
         if from_account:
             fields["from_account"] = from_account
         if to_account:
             fields["to_account"] = to_account
 
-        if result := self._classifier.classify(narration, txn_amount, fields if fields else None):
-            return self._classifier.add_balancing_postings(txn, result)
-
-        # 3. Use default accounts if no specific rule matched
-        default_account = (
-            self.default_income_account
-            if txn_amount > 0
-            else self.default_expense_account
-        )
-
-        balancing_posting = data.Posting(
-            account=default_account,
-            units=Amount(-txn_amount, self.currency),
-            cost=None,
-            price=None,
-            flag=None,
-            meta=None,
-        )
-        return txn._replace(postings=txn.postings + [balancing_posting])
+        return fields if fields else None
 
 
 def main():

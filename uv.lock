@@ -39,7 +39,7 @@ wheels = [
 [[package]]
 name = "beancount-classifier"
 version = "0.1.0"
-source = { git = "https://github.com/staticaland/beancount-classifier#c5da2f74dbacdad47b92834bfbbb34be664c4758" }
+source = { git = "https://github.com/staticaland/beancount-classifier#92b285ea2ef31b86c43772b0d1387b9bba5aed8b" }
 dependencies = [
     { name = "beancount" },
     { name = "pydantic" },
