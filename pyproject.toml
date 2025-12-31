@@ -7,6 +7,8 @@ requires-python = ">=3.12"
 dependencies = [
     "beangulp",
     "pypdf>=5.4.0",
+    "beancount-no-amex",
+    "pydantic>=2.10.6",
 ]
 
 [tool.uv]
@@ -14,6 +16,7 @@ package = true
 
 [tool.uv.sources]
 beangulp = { git = "https://github.com/beancount/beangulp" }
+beancount-no-amex = { git = "https://github.com/staticaland/beancount-no-amex" }
 
 [build-system]
 requires = ["hatchling"]

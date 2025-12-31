@@ -12,6 +12,12 @@ from beangulp import extract, similar, utils
 from beangulp.importers.csvbase import Column, CreditOrDebit, Date, Importer
 from beangulp.testing import main as test_main
 
+from beancount_no_amex.classify import (
+    TransactionPattern,
+    TransactionClassifier,
+    amount,
+)
+
 
 DIALECT_NAME = "sparebank1"
 
@@ -20,13 +26,25 @@ csv.register_dialect(DIALECT_NAME, delimiter=";")
 
 @dataclass
 class Sparebank1AccountConfig:
-    """Configuration for a SpareBank 1 account."""
+    """Configuration for a SpareBank 1 account.
+
+    Attributes:
+        primary_account_number: The bank account number for identification.
+        account_name: The Beancount account name (e.g., "Assets:Bank:SpareBank1:Checking").
+        currency: The currency of the account (default: "NOK").
+        other_account_mappings: List of (bank_account_number, beancount_account) tuples
+            for matching counterparty bank accounts.
+        transaction_patterns: List of TransactionPattern objects for narration-based
+            matching using the classifier system from beancount-no-amex.
+        default_expense_account: Default account for unmatched expenses.
+        default_income_account: Default account for unmatched income.
+    """
 
     primary_account_number: str
     account_name: str
     currency: str
     other_account_mappings: List[Tuple[str, str]] = field(default_factory=list)
-    narration_to_account_mappings: List[Tuple[str, str]] = field(default_factory=list)
+    transaction_patterns: List[TransactionPattern] = field(default_factory=list)
     default_expense_account: str = "Expenses:Unknown"
     default_income_account: str = "Income:Unknown"
 
@@ -70,12 +88,13 @@ class DepositAccountImporter(Importer):
     account_name: str
     currency: str
     other_account_mappings: List[Tuple[str, str]]
-    narration_to_account_mappings: List[Tuple[str, str]]
+    transaction_patterns: List[TransactionPattern]
     default_expense_account: str
     default_income_account: str
     dedup_window: datetime.timedelta
     dedup_max_date_delta: datetime.timedelta
     dedup_epsilon: Decimal
+    _classifier: TransactionClassifier
 
     def account(self, filepath: str) -> str:
         """
@@ -112,9 +131,15 @@ class DepositAccountImporter(Importer):
         account_name = config.account_name  # Local var for super init
         self.currency = config.currency
         self.other_account_mappings = config.other_account_mappings
-        self.narration_to_account_mappings = config.narration_to_account_mappings
+        self.transaction_patterns = config.transaction_patterns
         self.default_expense_account = config.default_expense_account
         self.default_income_account = config.default_income_account
+
+        # Create the transaction classifier for narration-based matching
+        self._classifier = TransactionClassifier(
+            patterns=self.transaction_patterns,
+            default_account=None,  # We handle defaults separately based on direction
+        )
 
         # Store deduplication settings
         self.dedup_window = datetime.timedelta(days=dedup_window_days)
@@ -237,11 +262,11 @@ class DepositAccountImporter(Importer):
     def finalize(self, txn: data.Transaction, row: Any) -> Optional[data.Transaction]:
         """
         Post-process the transaction with categorization based on account numbers
-        and narration patterns.
+        and narration patterns using the classifier system.
 
         Mapping precedence:
         1. Account number mappings (direction-aware)
-        2. Narration patterns
+        2. TransactionPattern matching via classifier (narration/amount based)
         3. Default accounts based on transaction direction
 
         Args:
@@ -252,63 +277,49 @@ class DepositAccountImporter(Importer):
             The modified transaction, or None if invalid.
         """
         if not txn.postings:
-            # Return original txn if no postings (or handle as error if needed)
             return txn
 
-        amount = txn.postings[0].units.number
+        txn_amount = txn.postings[0].units.number
         from_account = getattr(row, "fra_konto", "")
         to_account = getattr(row, "til_konto", "")
-        narration = txn.narration  # Get narration from transaction
+        narration = txn.narration or ""
 
-        balancing_account = None
-
-        # 1. & 2. Check account number mappings (direction-aware)
+        # 1. Check account number mappings (direction-aware)
         # Determine which account number to check based on transaction direction
-        account_to_check = to_account if amount < 0 else from_account
+        account_to_check = to_account if txn_amount < 0 else from_account
         if account_to_check:
-            # Use next() with a generator expression to find the first matching account mapping
-            balancing_account = next(
-                (
-                    acc  # Return the account name (acc)
-                    for pattern, acc in self.other_account_mappings  # Iterate through mappings
-                    if pattern
-                    == account_to_check  # Check if the pattern matches the account to check
-                ),
-                None,  # Default value if no match is found
-            )
+            for pattern, acc in self.other_account_mappings:
+                if pattern == account_to_check:
+                    # Found a match via bank account number
+                    balancing_posting = data.Posting(
+                        account=acc,
+                        units=Amount(-txn_amount, self.currency),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None,
+                    )
+                    return txn._replace(postings=txn.postings + [balancing_posting])
 
-        # 3. Check narration patterns if no account match yet
-        if balancing_account is None and narration:
-            # Use next() with a generator expression for narration mapping
-            balancing_account = next(
-                (
-                    acc  # Return the account name (acc)
-                    for pattern, acc in self.narration_to_account_mappings  # Iterate through mappings
-                    if pattern
-                    in narration  # Check if the pattern is a substring of the narration
-                ),
-                None,  # Default value if no match is found
-            )
+        # 2. Use the classifier for narration/amount-based pattern matching
+        if result := self._classifier.classify(narration, txn_amount):
+            return self._classifier.add_balancing_postings(txn, result)
 
-        # 4. Use default accounts if no specific rule matched
-        if balancing_account is None:
-            # Assign default income or expense account based on amount sign
-            balancing_account = (
-                self.default_income_account
-                if amount > 0
-                else self.default_expense_account
-            )
+        # 3. Use default accounts if no specific rule matched
+        default_account = (
+            self.default_income_account
+            if txn_amount > 0
+            else self.default_expense_account
+        )
 
-        # Create and add the single balancing posting using the determined account
         balancing_posting = data.Posting(
-            account=balancing_account,
-            units=Amount(-amount, self.currency),  # Opposite amount
+            account=default_account,
+            units=Amount(-txn_amount, self.currency),
             cost=None,
             price=None,
             flag=None,
             meta=None,
         )
-        # Return the transaction with the original postings plus the new balancing posting
         return txn._replace(postings=txn.postings + [balancing_posting])
 
 
@@ -321,11 +332,24 @@ def main():
             ("98712345678", "Assets:Bank:SpareBank1:Savings"),
             ("56712345678", "Income:Salary"),
         ],
-        narration_to_account_mappings=[
-            ("KIWI", "Expenses:Groceries"),
-            ("MENY", "Expenses:Groceries"),
-            ("VINMONOPOLET", "Expenses:Alcohol"),
-            ("RUTER", "Expenses:Transport"),
+        transaction_patterns=[
+            # Simple substring matching
+            TransactionPattern(narration="KIWI", account="Expenses:Groceries"),
+            TransactionPattern(narration="MENY", account="Expenses:Groceries"),
+            TransactionPattern(narration="VINMONOPOLET", account="Expenses:Alcohol"),
+            TransactionPattern(narration="RUTER", account="Expenses:Transport"),
+            # Regex matching example
+            TransactionPattern(
+                narration=r"REMA\s*1000",
+                regex=True,
+                account="Expenses:Groceries",
+            ),
+            # Amount-based matching example
+            TransactionPattern(
+                narration="ATM",
+                amount_condition=amount > 500,
+                account="Expenses:Cash:Large",
+            ),
         ],
         # Default values are handled by the dataclass, but can be overridden if needed
         # default_expense_account="Expenses:SomethingElse",
