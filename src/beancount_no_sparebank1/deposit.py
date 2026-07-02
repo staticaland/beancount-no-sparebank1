@@ -12,16 +12,10 @@ from beancount.core import data
 from beancount.core.amount import Amount
 from beangulp import extract, similar, utils
 from beangulp.importers.csvbase import Column, CreditOrDebit, Date, Importer
-from beangulp.testing import main as test_main
 
 from beancount_classifier import (
     TransactionPattern,
-    TransactionClassifier,
     ClassifierMixin,
-    amount,
-    match,
-    when,
-    field,
     counterparty,
 )
 
@@ -341,48 +335,3 @@ class DepositAccountImporter(ClassifierMixin, Importer):
             fields["to_account"] = to_account
 
         return fields if fields else None
-
-
-def main():
-    checking_config = Sparebank1AccountConfig(
-        primary_account_number="12345678901",
-        account_name="Assets:Bank:SpareBank1:Checking",
-        currency="NOK",
-        other_account_mappings=[
-            ("98712345678", "Assets:Bank:SpareBank1:Savings"),
-            ("56712345678", "Income:Salary"),
-        ],
-        transaction_patterns=[
-            # Fluent API - simple substring matching
-            match("KIWI") >> "Expenses:Groceries",
-            match("MENY") >> "Expenses:Groceries",
-            match("VINMONOPOLET") >> "Expenses:Alcohol",
-            match("RUTER") >> "Expenses:Transport",
-
-            # Fluent API - regex matching
-            match(r"REMA\s*1000").regex >> "Expenses:Groceries",
-
-            # Fluent API - case-insensitive
-            match("spotify").ignorecase >> "Expenses:Subscriptions",
-
-            # Fluent API - amount condition with narration
-            match("ATM").where(amount > 500) >> "Expenses:Cash:Large",
-
-            # Fluent API - amount-only matching
-            when(amount < 50) >> "Expenses:PettyCash",
-
-            # Fluent API - field-based matching (matches bank account numbers)
-            field(to_account="11112222333") >> "Assets:Bank:SpareBank1:Savings",
-        ],
-        # Default values are handled by the dataclass, but can be overridden if needed
-        # default_expense_account="Expenses:SomethingElse",
-        # default_income_account="Income:SomethingElse",
-    )
-
-    checking_importer = DepositAccountImporter(config=checking_config)
-
-    test_main(checking_importer)
-
-
-if __name__ == "__main__":
-    main()

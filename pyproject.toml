@@ -32,6 +32,3 @@ packages = ["src/beancount_no_sparebank1"]
 
 [tool.hatch.version]
 path = "src/beancount_no_sparebank1/version.py"
-
-[project.scripts]
-beancount-no-sparebank1 = "beancount_no_sparebank1.deposit:main"

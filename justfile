@@ -25,12 +25,6 @@ isort:
 check-all:
     ruff check --select ALL {{path}}
 
-test:
-    uv run beancount-no-sparebank1 test test_data
-
-test-gen:
-    uv run beancount-no-sparebank1 generate test_data
-
 # Runs both check and format
 all: check isort format
     @echo "Both check and format completed"
