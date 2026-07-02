@@ -1,6 +1,7 @@
 import datetime
 import re
 import logging
+from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
 from typing import List, Optional
@@ -9,8 +10,18 @@ import pypdf
 from beancount.core import data
 from beancount.core.amount import Amount
 from beancount.core.number import D
-from beangulp import extract, similar, utils
+from beangulp import extract, utils
 from beangulp.importer import Importer
+
+
+@dataclass
+class PDFStatementConfig:
+    """Configuration for SpareBank 1 PDF balance statements."""
+
+    account_name: str
+    currency: str = "NOK"
+    prefix: str = "bank"
+    generate_balance_assertions: bool = True
 
 
 class PDFStatementImporter(Importer):
@@ -25,9 +36,10 @@ class PDFStatementImporter(Importer):
 
     def __init__(
         self,
-        account_name: str,
+        config: PDFStatementConfig | str,
         currency: str = "NOK",
         prefix: str = "bank",
+        generate_balance_assertions: bool = True,
         dedup_window_days: int = 3,
         dedup_max_date_delta: int = 2,
         dedup_epsilon: Decimal = Decimal("0.05"),
@@ -37,17 +49,26 @@ class PDFStatementImporter(Importer):
         Initialize a PDF statement importer.
 
         Args:
-            account_name: The Beancount account name (e.g., "Assets:Bank:SpareBank1").
-            currency: The currency of the account (default: "NOK").
-            prefix: Prefix for generated filenames (default: "bank").
+            config: A PDFStatementConfig object, or the Beancount account name
+                for backwards-compatible direct construction.
+            currency: The currency of the account when config is a string.
+            prefix: Prefix for generated filenames when config is a string.
+            generate_balance_assertions: Whether to emit balance assertions.
             flag: Transaction flag (default: "*").
             dedup_window_days: Days to look back for duplicates.
             dedup_max_date_delta: Max days difference for duplicate detection.
             dedup_epsilon: Tolerance for amount differences in duplicates.
         """
-        self.account_name = account_name
-        self.currency = currency
-        self.prefix = prefix
+        if isinstance(config, PDFStatementConfig):
+            self.account_name = config.account_name
+            self.currency = config.currency
+            self.prefix = config.prefix
+            self.generate_balance_assertions = config.generate_balance_assertions
+        else:
+            self.account_name = config
+            self.currency = currency
+            self.prefix = prefix
+            self.generate_balance_assertions = generate_balance_assertions
         self.flag = flag
 
         self.dedup_window = datetime.timedelta(days=dedup_window_days)
@@ -119,6 +140,8 @@ class PDFStatementImporter(Importer):
             List containing exactly one balance directive.
         """
         entries = []
+        if not self.generate_balance_assertions:
+            return entries
 
         try:
             # Extract text from the full PDF
@@ -196,12 +219,9 @@ class PDFStatementImporter(Importer):
             entries: List of new entries to check for duplicates.
             existing: List of existing entries to compare against.
         """
-        comparator = similar.heuristic_comparator(
-            max_date_delta=self.dedup_max_date_delta,
-            epsilon=self.dedup_epsilon,
+        extract.mark_duplicate_entries(
+            entries, existing, self.dedup_window, same_balance_assertion
         )
-
-        extract.mark_duplicate_entries(entries, existing, self.dedup_window, comparator)
 
     def _extract_end_date(self, text: str) -> Optional[datetime.date]:
         """
@@ -267,3 +287,13 @@ class PDFStatementImporter(Importer):
             return all_balances[-1]
 
         return None
+
+
+def same_balance_assertion(
+    entry1: data.Directive, entry2: data.Directive
+) -> bool:
+    """Return True when two balance assertions have the same natural identity."""
+    if not isinstance(entry1, data.Balance) or not isinstance(entry2, data.Balance):
+        return False
+
+    return entry1.date == entry2.date and entry1.account == entry2.account

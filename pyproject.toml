@@ -9,6 +9,7 @@ dependencies = [
     "pypdf>=5.4.0",
     "beancount-classifier",
     "pydantic>=2.10.6",
+    "typing-extensions>=4.15",
 ]
 
 [tool.uv]

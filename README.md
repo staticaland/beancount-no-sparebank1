@@ -269,15 +269,21 @@ The SpareBank 1 importer exposes these fields for matching:
 Extract balance assertions from PDF "kontoutskrift" statements:
 
 ```python
-from beancount_no_sparebank1 import PDFStatementImporter
+from beancount_no_sparebank1 import PDFStatementConfig, PDFStatementImporter
 
 importers = [
     PDFStatementImporter(
-        account_name="Assets:Bank:SpareBank1:Checking",
-        currency="NOK",
+        PDFStatementConfig(
+            account_name="Assets:Bank:SpareBank1:Checking",
+            currency="NOK",
+            generate_balance_assertions=True,
+        )
     ),
 ]
 ```
+
+Balance assertions are dated on the day after the statement end date because
+Beancount checks balances at the start of the assertion date.
 
 ## Configuration Reference
 
@@ -309,6 +315,7 @@ Sparebank1AccountConfig(
 -   Each CSV file should contain transactions from a single account
 -   The importer identifies files by checking if the primary account number appears in transactions
 -   Duplicate detection uses date, amount, and narration similarity
+-   PDF balance statement duplicate detection uses account and assertion date
 
 ## See also
 
