@@ -1,24 +1,21 @@
 import csv
 import datetime
 import hashlib
+import itertools
 from collections import Counter
+from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
-import itertools
-from dataclasses import dataclass, field
+from typing import Any, Dict, List, Tuple
 
 from beancount.core import data
-from beancount.core.amount import Amount
-from beangulp import extract, similar, utils
-from beangulp.importers.csvbase import Column, CreditOrDebit, Date, Importer
-
 from beancount_classifier import (
-    TransactionPattern,
     ClassifierMixin,
+    TransactionPattern,
     counterparty,
 )
-
+from beangulp import extract, similar, utils
+from beangulp.importers.csvbase import Column, CreditOrDebit, Date, Importer
 
 DIALECT_NAME = "sparebank1"
 

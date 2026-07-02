@@ -1,6 +1,6 @@
 import datetime
-import re
 import logging
+import re
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -139,7 +139,7 @@ class PDFStatementImporter(Importer):
         Returns:
             List containing exactly one balance directive.
         """
-        entries = []
+        entries: List[data.Directive] = []
         if not self.generate_balance_assertions:
             return entries
 
