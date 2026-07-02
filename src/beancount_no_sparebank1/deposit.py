@@ -1,5 +1,7 @@
 import csv
 import datetime
+import hashlib
+from collections import Counter
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -27,6 +29,12 @@ from beancount_classifier import (
 DIALECT_NAME = "sparebank1"
 
 csv.register_dialect(DIALECT_NAME, delimiter=";")
+
+# Metadata key for the deterministic transaction identity. SpareBank 1 CSV
+# exports carry no provider-assigned transaction ID, so the importer derives
+# one from the row content. Downstream tools (e.g. split preservation in a
+# ledger project) match re-imported transactions by this key.
+IMPORT_FINGERPRINT_META_KEY = "import_fingerprint"
 
 
 @dataclass
@@ -156,6 +164,9 @@ class DepositAccountImporter(ClassifierMixin, Importer):
         self.dedup_max_date_delta = datetime.timedelta(days=dedup_max_date_delta)
         self.dedup_epsilon = dedup_epsilon
 
+        # Per-file occurrence counts backing import fingerprints; reset in extract()
+        self._fingerprint_occurrences: Counter = Counter()
+
         # Call parent constructor AFTER storing config needed by other methods
         super().__init__(account_name, self.currency, flag=flag)
         # Now store account_name on self as well, consistent with other attrs
@@ -247,6 +258,44 @@ class DepositAccountImporter(ClassifierMixin, Importer):
 
         extract.mark_duplicate_entries(entries, existing, self.dedup_window, comparator)
 
+    def extract(
+        self, filepath: str, existing: List[data.Directive]
+    ) -> List[data.Directive]:
+        """Extract entries, resetting fingerprint state for the file."""
+        self._fingerprint_occurrences = Counter()
+        return super().extract(filepath, existing)
+
+    def _import_fingerprint(self, row: Any) -> str:
+        """
+        Compute a deterministic identity for a transaction row.
+
+        The fingerprint is derived only from row content, so the same
+        transaction gets the same fingerprint regardless of which export file
+        it appears in (e.g. a monthly export vs. an overlapping date-range
+        export). Identical rows within one file are disambiguated with an
+        occurrence counter, which stays consistent across exports as long as
+        the bank lists transactions in a stable order.
+
+        Args:
+            row: Row object containing parsed CSV data.
+
+        Returns:
+            A short hex digest string.
+        """
+        parts = [
+            str(getattr(row, "date", "")),
+            str(getattr(row, "amount", "")),
+            getattr(row, "narration", "") or "",
+            getattr(row, "rentedato", "") or "",
+            getattr(row, "til_konto", "") or "",
+            getattr(row, "fra_konto", "") or "",
+        ]
+        base = "\0".join(parts)
+        occurrence = self._fingerprint_occurrences[base]
+        self._fingerprint_occurrences[base] += 1
+        digest = hashlib.sha256(f"{base}\0{occurrence}".encode("utf-8")).hexdigest()
+        return digest[:24]
+
     def metadata(self, filepath: str, lineno: int, row: Any) -> Dict[str, Any]:
         """
         Build transaction metadata dictionary from row data.
@@ -265,6 +314,7 @@ class DepositAccountImporter(ClassifierMixin, Importer):
         meta["rentedato"] = getattr(row, "rentedato", "")
         meta["to_account"] = getattr(row, "til_konto", "")
         meta["from_account"] = getattr(row, "fra_konto", "")
+        meta[IMPORT_FINGERPRINT_META_KEY] = self._import_fingerprint(row)
 
         # Filter out None values to keep metadata clean
         return {k: v for k, v in meta.items() if v != ""}

@@ -5,89 +5,104 @@
 2025-01-30 * "HUSLEIE FEBRUAR"
   to_account: "65432198765"
   from_account: "12345678901"
+  import_fingerprint: "42621a0bb00b5bc474110bc9"
   Assets:Bank:SpareBank1:Checking  -11300.00 NOK
   Expenses:Unknown                  11300.00 NOK
 
 2025-02-02 * "Overføring fra Maria"
   to_account: "12345678901"
   from_account: "45612378901"
+  import_fingerprint: "255053a94062c640d39d0654"
   Assets:Bank:SpareBank1:Checking   2500.00 NOK
   Income:Unknown                   -2500.00 NOK
 
 2025-02-03 * "OBS BYGG LILLESTRØM"
   to_account: "78901234567"
   from_account: "12345678901"
+  import_fingerprint: "f49ecd66f2f73bdde5fd77be"
   Assets:Bank:SpareBank1:Checking  -4325.90 NOK
   Expenses:Unknown                  4325.90 NOK
 
 2025-02-05 * "GET/TELIA"
   to_account: "34512389012"
   from_account: "12345678901"
+  import_fingerprint: "2dc7e95d6831cdde9262964c"
   Assets:Bank:SpareBank1:Checking  -629.00 NOK
   Expenses:Unknown                  629.00 NOK
 
 2025-02-07 * "SKATTEETATEN"
   to_account: "12345678901"
   from_account: "99988877766"
+  import_fingerprint: "7622e144ac1f63a6106ecb38"
   Assets:Bank:SpareBank1:Checking   2187.00 NOK
   Income:Unknown                   -2187.00 NOK
 
 2025-02-10 * "VINMONOPOLET OSLO S"
   to_account: "89123456789"
   from_account: "12345678901"
+  import_fingerprint: "4570ac1c3adf299ced53fd15"
   Assets:Bank:SpareBank1:Checking  -675.00 NOK
   Expenses:Alcohol                  675.00 NOK
 
 2025-02-12 * "XXL SPORT ALNA"
   to_account: "34567812390"
   from_account: "12345678901"
+  import_fingerprint: "9fd386c7526504b68176fb3f"
   Assets:Bank:SpareBank1:Checking  -1249.00 NOK
   Expenses:Unknown                  1249.00 NOK
 
 2025-02-14 * "Lønn KOMPLETT AS"
   to_account: "12345678901"
   from_account: "56712345678"
+  import_fingerprint: "caeada47b16ade3feee96d99"
   Assets:Bank:SpareBank1:Checking   28750.34 NOK
   Income:Salary                    -28750.34 NOK
 
 2025-02-15 * "STATOIL FURUSET"
   to_account: "23489156123"
   from_account: "12345678901"
+  import_fingerprint: "28d923d31ec31cc26f426a14"
   Assets:Bank:SpareBank1:Checking  -723.45 NOK
   Expenses:Unknown                  723.45 NOK
 
 2025-02-18 * "FINN.NO FAKTURA"
   to_account: "87654321987"
   from_account: "12345678901"
+  import_fingerprint: "7fec5bcf4e2f6be4eb226fd5"
   Assets:Bank:SpareBank1:Checking  -89.00 NOK
   Expenses:Unknown                  89.00 NOK
 
 2025-02-20 * "MENY BOGSTADVEIEN"
   to_account: "23451298765"
   from_account: "12345678901"
+  import_fingerprint: "90a6425f41cad2781c9bbb90"
   Assets:Bank:SpareBank1:Checking  -523.78 NOK
   Expenses:Groceries                523.78 NOK
 
 2025-02-22 * "POWER STORO"
   to_account: "56712389012"
   from_account: "12345678901"
+  import_fingerprint: "aa267ce100d1f2cd19c56dad"
   Assets:Bank:SpareBank1:Checking  -3799.00 NOK
   Expenses:Unknown                  3799.00 NOK
 
 2025-02-25 * "RUTER MÅNEDSKORT"
   to_account: "34567891234"
   from_account: "12345678901"
+  import_fingerprint: "a37e8b527e10e9da41f8bb32"
   Assets:Bank:SpareBank1:Checking  -814.00 NOK
   Expenses:Transport                814.00 NOK
 
 2025-02-26 * "Overføring til Sparekonto"
   to_account: "98712345678"
   from_account: "12345678901"
+  import_fingerprint: "fe0c50451c71c10cb263fb25"
   Assets:Bank:SpareBank1:Checking  -5000.00 NOK
   Assets:Bank:SpareBank1:Savings    5000.00 NOK
 
 2025-02-28 * "KIWI MAJORSTUEN"
   to_account: "12345678901"
   from_account: "98765432109"
+  import_fingerprint: "1240d8027c738eb8632e4650"
   Assets:Bank:SpareBank1:Checking  -348.56 NOK
   Expenses:Groceries                348.56 NOK
