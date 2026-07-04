@@ -6,7 +6,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from beancount.core import data
 from beancount_classifier import (
@@ -39,18 +39,24 @@ class Sparebank1AccountConfig:
         other_account_mappings: List of (bank_account_number, beancount_account) tuples
             for matching counterparty bank accounts.
         transaction_patterns: List of TransactionPattern objects for narration-based
-            matching using the classifier system from beancount-no-amex.
-        default_expense_account: Default account for unmatched expenses.
-        default_income_account: Default account for unmatched income.
+            matching using the classifier system from beancount-classifier.
+        default_account: Account for unmatched transactions in either direction.
+            Shorthand when one fallback is enough; leave all defaults unset to
+            keep unmatched transactions without a balancing posting.
+        default_expense_account: Default account for unmatched expenses
+            (amount < 0). Takes precedence over default_account for expenses.
+        default_income_account: Default account for unmatched income
+            (amount > 0). Takes precedence over default_account for income.
     """
 
     primary_account_number: str
     account_name: str
-    currency: str
+    currency: str = "NOK"
     other_account_mappings: List[Tuple[str, str]] = field(default_factory=list)
     transaction_patterns: List[TransactionPattern] = field(default_factory=list)
-    default_expense_account: str = "Expenses:Unknown"
-    default_income_account: str = "Income:Unknown"
+    default_account: Optional[str] = None
+    default_expense_account: Optional[str] = None
+    default_income_account: Optional[str] = None
 
 
 class DepositAccountImporter(ClassifierMixin, Importer):
@@ -97,8 +103,9 @@ class DepositAccountImporter(ClassifierMixin, Importer):
     account_name: str
     currency: str
     transaction_patterns: List[TransactionPattern]  # Used by ClassifierMixin
-    default_expense: str  # Used by ClassifierMixin (direction-aware)
-    default_income: str   # Used by ClassifierMixin (direction-aware)
+    default_account: Optional[str]  # Used by ClassifierMixin (both directions)
+    default_expense: Optional[str]  # Used by ClassifierMixin (direction-aware)
+    default_income: Optional[str]   # Used by ClassifierMixin (direction-aware)
     dedup_window: datetime.timedelta
     dedup_max_date_delta: datetime.timedelta
     dedup_epsilon: Decimal
@@ -146,7 +153,9 @@ class DepositAccountImporter(ClassifierMixin, Importer):
         ]
         self.transaction_patterns = counterparty_patterns + list(config.transaction_patterns)
 
-        # ClassifierMixin uses these for direction-aware defaults
+        # ClassifierMixin uses these for direction-aware defaults, falling
+        # back to default_account for either direction when unset
+        self.default_account = config.default_account
         self.default_expense = config.default_expense_account
         self.default_income = config.default_income_account
 
