@@ -252,20 +252,10 @@ class Importer(ClassifierMixin, CSVImporter):
             return False  # If we can't read/parse, we can't identify
 
     def filename(self, filepath: str) -> str:
-        """
-        Generate a descriptive filename using the configured account name.
-
-        Args:
-            filepath: Original file path.
-
-        Returns:
-            A string with a sanitized account name and original filename.
-        """
-        # Sanitize account name for use in filename
-        # Use self.account_name which is set in __init__
-        account_part = self.account_name.replace(":", "-").replace(" ", "_")
+        """Generate a provider/account/original filename for archived data."""
+        account_part = self.account_name.split(":")[-1]
         original_filename = Path(filepath).name
-        return f"{account_part}.{original_filename}"
+        return f"sparebank1.{account_part}.{original_filename}"
 
     def deduplicate(
         self, entries: List[data.Directive], existing: List[data.Directive]

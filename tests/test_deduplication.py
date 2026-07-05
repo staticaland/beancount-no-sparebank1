@@ -37,6 +37,12 @@ def test_dedup_tuning_lives_in_config() -> None:
     assert importer.dedup_epsilon == D("0.10")
 
 
+def test_csv_filename_uses_provider_and_account_leaf(tmp_path) -> None:
+    statement = tmp_path / "2025-01.csv"
+
+    assert _importer().filename(str(statement)) == "sparebank1.Checking.2025-01.csv"
+
+
 def _transaction(fingerprint: str | None, amount: str = "-100.00") -> data.Transaction:
     meta = data.new_metadata("<test>", 1)
     if fingerprint is not None:

@@ -48,6 +48,18 @@ def test_pdf_statement_importer_uses_config_dedup_tuning() -> None:
     assert importer.dedup_epsilon == D("0.10")
 
 
+def test_pdf_statement_filename_uses_provider_and_account_leaf(tmp_path) -> None:
+    importer = StatementImporter(
+        StatementConfig(
+            account_name="Assets:Bank:SpareBank1:Checking",
+            prefix="legacy",
+        )
+    )
+    statement = tmp_path / "statement.pdf"
+
+    assert importer.filename(str(statement)) == "sparebank1.Checking.statement.pdf"
+
+
 def test_balance_assertion_duplicates_match_on_account_and_date() -> None:
     first = balance("Assets:Bank:SpareBank1:Checking", datetime.date(2025, 2, 1), "10.00")
     same_identity = balance("Assets:Bank:SpareBank1:Checking", datetime.date(2025, 2, 1), "20.00")

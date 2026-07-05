@@ -98,16 +98,9 @@ class StatementImporter(Importer):
             return False
 
     def filename(self, filepath: str) -> str:
-        """
-        Generate a descriptive filename.
-
-        Args:
-            filepath: Original file path.
-
-        Returns:
-            A string with prefix and original filename.
-        """
-        return f"{self.prefix}.{Path(filepath).name}"
+        """Generate a provider/account/original filename for archived data."""
+        account_leaf = self.account_name.split(":")[-1]
+        return f"sparebank1.{account_leaf}.{Path(filepath).name}"
 
     def account(self, filepath: str) -> str:
         """Return the account name for this importer."""
