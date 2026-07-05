@@ -28,6 +28,13 @@ csv.register_dialect(DIALECT_NAME, delimiter=";")
 IMPORT_FINGERPRINT_META_KEY = "import_fingerprint"
 
 
+def _entry_import_fingerprint(entry: data.Directive) -> str | None:
+    if not isinstance(entry, data.Transaction):
+        return None
+    fingerprint = entry.meta.get(IMPORT_FINGERPRINT_META_KEY)
+    return str(fingerprint) if fingerprint else None
+
+
 @dataclass
 class Sparebank1AccountConfig:
     """Configuration for a SpareBank 1 account.
@@ -251,10 +258,17 @@ class DepositAccountImporter(ClassifierMixin, Importer):
             existing: List of existing entries to compare against.
         """
 
-        comparator = similar.heuristic_comparator(
+        heuristic_comparator = similar.heuristic_comparator(
             max_date_delta=self.dedup_max_date_delta,
             epsilon=self.dedup_epsilon,
         )
+
+        def comparator(entry: data.Directive, target: data.Directive) -> bool:
+            entry_fingerprint = _entry_import_fingerprint(entry)
+            target_fingerprint = _entry_import_fingerprint(target)
+            if entry_fingerprint and target_fingerprint:
+                return entry_fingerprint == target_fingerprint
+            return heuristic_comparator(entry, target)
 
         extract.mark_duplicate_entries(entries, existing, self.dedup_window, comparator)
 
