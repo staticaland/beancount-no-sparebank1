@@ -23,12 +23,15 @@ def test_dedup_tuning_lives_in_config() -> None:
         Config(
             primary_account_number="12345678901",
             account_name="Assets:Bank:SpareBank1:Checking",
+            default_account="Expenses:NeedsReview",
+            default_split_percentage=50,
             dedup_window_days=7,
             dedup_max_date_delta=4,
             dedup_epsilon=D("0.10"),
         )
     )
 
+    assert importer.default_split_percentage == D("50")
     assert importer.dedup_window.days == 7
     assert importer.dedup_max_date_delta.days == 4
     assert importer.dedup_epsilon == D("0.10")
@@ -66,6 +69,22 @@ def test_matching_fingerprint_marks_duplicate() -> None:
     _importer().deduplicate(entries, existing)
 
     assert "__duplicate__" in entries[0].meta
+
+
+def test_skip_deduplication_leaves_matching_fingerprint_unmarked() -> None:
+    entries: list[data.Directive] = [_transaction("same-fingerprint")]
+    existing: list[data.Directive] = [_transaction("same-fingerprint")]
+    importer = Importer(
+        Config(
+            primary_account_number="12345678901",
+            account_name="Assets:Bank:SpareBank1:Checking",
+            skip_deduplication=True,
+        )
+    )
+
+    importer.deduplicate(entries, existing)
+
+    assert "__duplicate__" not in entries[0].meta
 
 
 def test_different_fingerprints_prevent_fuzzy_false_positive() -> None:

@@ -307,8 +307,15 @@ Config(
     ],
 
     # Optional: fallback accounts for unmatched transactions
+    default_account="Expenses:Unknown",
     default_expense_account="Expenses:Unknown",
     default_income_account="Income:Unknown",
+
+    # Optional: split matched transactions with the default account for review
+    default_split_percentage=50,
+
+    # Optional: force re-import without duplicate marking
+    skip_deduplication=False,
 
     # Optional: duplicate detection tuning
     dedup_window_days=3,

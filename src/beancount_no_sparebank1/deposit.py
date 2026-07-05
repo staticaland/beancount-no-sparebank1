@@ -56,6 +56,9 @@ class Config:
             (amount < 0). Takes precedence over default_account for expenses.
         default_income_account: Default account for unmatched income
             (amount > 0). Takes precedence over default_account for income.
+        default_split_percentage: When set (0-100), matched transactions are split between
+            the matched account(s) and default_account. Requires default_account to be set.
+        skip_deduplication: When True, skip import_fingerprint-based deduplication.
         dedup_window_days: Days to look back for duplicates.
         dedup_max_date_delta: Max days difference for duplicate detection.
         dedup_epsilon: Tolerance for amount differences in duplicates.
@@ -69,6 +72,8 @@ class Config:
     default_account: Optional[str] = None
     default_expense_account: Optional[str] = None
     default_income_account: Optional[str] = None
+    default_split_percentage: int | float | None = None
+    skip_deduplication: bool = False
     dedup_window_days: int = 3
     dedup_max_date_delta: int = 2
     dedup_epsilon: Decimal = Decimal("0.05")
@@ -136,6 +141,8 @@ class Importer(ClassifierMixin, CSVImporter):
     default_account: Optional[str]  # Used by ClassifierMixin (both directions)
     default_expense: Optional[str]  # Used by ClassifierMixin (direction-aware)
     default_income: Optional[str]   # Used by ClassifierMixin (direction-aware)
+    default_split_percentage: Optional[Decimal]  # Used by ClassifierMixin
+    skip_deduplication: bool
     dedup_window: datetime.timedelta
     dedup_max_date_delta: datetime.timedelta
     dedup_epsilon: Decimal
@@ -184,8 +191,14 @@ class Importer(ClassifierMixin, CSVImporter):
         self.default_account = config.default_account
         self.default_expense = config.default_expense_account
         self.default_income = config.default_income_account
+        self.default_split_percentage = (
+            Decimal(str(config.default_split_percentage))
+            if config.default_split_percentage is not None
+            else None
+        )
 
         # Store deduplication settings
+        self.skip_deduplication = config.skip_deduplication
         self.dedup_window = datetime.timedelta(days=config.dedup_window_days)
         self.dedup_max_date_delta = datetime.timedelta(days=config.dedup_max_date_delta)
         self.dedup_epsilon = config.dedup_epsilon
@@ -278,6 +291,8 @@ class Importer(ClassifierMixin, CSVImporter):
             entries: List of new entries to check for duplicates.
             existing: List of existing entries to compare against.
         """
+        if self.skip_deduplication:
+            return
 
         heuristic_comparator = similar.heuristic_comparator(
             max_date_delta=self.dedup_max_date_delta,
