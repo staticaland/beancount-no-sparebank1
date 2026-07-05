@@ -1,9 +1,7 @@
 import csv
 import datetime
-import hashlib
 import itertools
 import warnings
-from collections import Counter
 from dataclasses import dataclass, field
 from decimal import Decimal
 from pathlib import Path
@@ -11,9 +9,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from beancount.core import data
 from beancount_classifier import (
+    IMPORT_FINGERPRINT_META_KEY,
     ClassifierMixin,
+    ImportFingerprintTracker,
     TransactionPattern,
     counterparty,
+    entry_import_fingerprint,
 )
 from beangulp import extract, similar, utils
 from beangulp.importers.csvbase import Column, CreditOrDebit, Date
@@ -22,20 +23,6 @@ from beangulp.importers.csvbase import Importer as CSVImporter
 DIALECT_NAME = "sparebank1"
 
 csv.register_dialect(DIALECT_NAME, delimiter=";")
-
-# Metadata key for the deterministic transaction identity. SpareBank 1 CSV
-# exports carry no provider-assigned transaction ID, so the importer derives
-# one from the row content. Downstream tools (e.g. split preservation in a
-# ledger project) match re-imported transactions by this key.
-IMPORT_FINGERPRINT_META_KEY = "import_fingerprint"
-
-
-def _entry_import_fingerprint(entry: data.Directive) -> str | None:
-    if not isinstance(entry, data.Transaction):
-        return None
-    fingerprint = entry.meta.get(IMPORT_FINGERPRINT_META_KEY)
-    return str(fingerprint) if fingerprint else None
-
 
 @dataclass
 class Config:
@@ -204,8 +191,7 @@ class Importer(ClassifierMixin, CSVImporter):
         self.dedup_epsilon = config.dedup_epsilon
         self.debug = debug
 
-        # Per-file occurrence counts backing import fingerprints; reset in extract()
-        self._fingerprint_occurrences: Counter = Counter()
+        self._fingerprint_tracker = ImportFingerprintTracker()
 
         # Call parent constructor AFTER storing config needed by other methods
         super().__init__(account_name, self.currency, flag=flag)
@@ -300,8 +286,8 @@ class Importer(ClassifierMixin, CSVImporter):
         )
 
         def comparator(entry: data.Directive, target: data.Directive) -> bool:
-            entry_fingerprint = _entry_import_fingerprint(entry)
-            target_fingerprint = _entry_import_fingerprint(target)
+            entry_fingerprint = entry_import_fingerprint(entry)
+            target_fingerprint = entry_import_fingerprint(target)
             if entry_fingerprint and target_fingerprint:
                 return entry_fingerprint == target_fingerprint
             return heuristic_comparator(entry, target)
@@ -312,39 +298,19 @@ class Importer(ClassifierMixin, CSVImporter):
         self, filepath: str, existing: List[data.Directive]
     ) -> List[data.Directive]:
         """Extract entries, resetting fingerprint state for the file."""
-        self._fingerprint_occurrences = Counter()
+        self._fingerprint_tracker.reset()
         return super().extract(filepath, existing)
 
-    def _import_fingerprint(self, row: Any) -> str:
-        """
-        Compute a deterministic identity for a transaction row.
-
-        The fingerprint is derived only from row content, so the same
-        transaction gets the same fingerprint regardless of which export file
-        it appears in (e.g. a monthly export vs. an overlapping date-range
-        export). Identical rows within one file are disambiguated with an
-        occurrence counter, which stays consistent across exports as long as
-        the bank lists transactions in a stable order.
-
-        Args:
-            row: Row object containing parsed CSV data.
-
-        Returns:
-            A short hex digest string.
-        """
-        parts = [
+    def _fingerprint_parts(self, row: Any) -> tuple[str, ...]:
+        """Row-content identity parts for SpareBank 1 CSV imports."""
+        return (
             str(getattr(row, "date", "")),
             str(getattr(row, "amount", "")),
             getattr(row, "narration", "") or "",
             getattr(row, "rentedato", "") or "",
             getattr(row, "til_konto", "") or "",
             getattr(row, "fra_konto", "") or "",
-        ]
-        base = "\0".join(parts)
-        occurrence = self._fingerprint_occurrences[base]
-        self._fingerprint_occurrences[base] += 1
-        digest = hashlib.sha256(f"{base}\0{occurrence}".encode("utf-8")).hexdigest()
-        return digest[:24]
+        )
 
     def metadata(self, filepath: str, lineno: int, row: Any) -> Dict[str, Any]:
         """
@@ -364,7 +330,9 @@ class Importer(ClassifierMixin, CSVImporter):
         meta["rentedato"] = getattr(row, "rentedato", "")
         meta["to_account"] = getattr(row, "til_konto", "")
         meta["from_account"] = getattr(row, "fra_konto", "")
-        meta[IMPORT_FINGERPRINT_META_KEY] = self._import_fingerprint(row)
+        meta[IMPORT_FINGERPRINT_META_KEY] = self._fingerprint_tracker.fingerprint(
+            self._fingerprint_parts(row)
+        )
 
         # Filter out None values to keep metadata clean
         return {k: v for k, v in meta.items() if v != ""}
