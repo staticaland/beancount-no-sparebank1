@@ -16,7 +16,8 @@ from beancount_classifier import (
     counterparty,
 )
 from beangulp import extract, similar, utils
-from beangulp.importers.csvbase import Column, CreditOrDebit, Date, Importer as CSVImporter
+from beangulp.importers.csvbase import Column, CreditOrDebit, Date
+from beangulp.importers.csvbase import Importer as CSVImporter
 
 DIALECT_NAME = "sparebank1"
 
@@ -55,6 +56,9 @@ class Config:
             (amount < 0). Takes precedence over default_account for expenses.
         default_income_account: Default account for unmatched income
             (amount > 0). Takes precedence over default_account for income.
+        dedup_window_days: Days to look back for duplicates.
+        dedup_max_date_delta: Max days difference for duplicate detection.
+        dedup_epsilon: Tolerance for amount differences in duplicates.
     """
 
     primary_account_number: str
@@ -65,6 +69,9 @@ class Config:
     default_account: Optional[str] = None
     default_expense_account: Optional[str] = None
     default_income_account: Optional[str] = None
+    dedup_window_days: int = 3
+    dedup_max_date_delta: int = 2
+    dedup_epsilon: Decimal = Decimal("0.05")
 
 
 Sparebank1Config = Config
@@ -148,10 +155,8 @@ class Importer(ClassifierMixin, CSVImporter):
     def __init__(
         self,
         config: Config,
-        dedup_window_days: int = 3,
-        dedup_max_date_delta: int = 2,
-        dedup_epsilon: Decimal = Decimal("0.05"),
         flag: str = "*",
+        debug: bool = False,
     ):
         """
         Initialize a SpareBank 1 importer using a configuration object.
@@ -159,9 +164,7 @@ class Importer(ClassifierMixin, CSVImporter):
         Args:
             config: A Config object with account details.
             flag: Transaction flag (default: "*").
-            dedup_window_days: Days to look back for duplicates.
-            dedup_max_date_delta: Max days difference for duplicate detection.
-            dedup_epsilon: Tolerance for amount differences in duplicates.
+            debug: Enable debug output (default: False).
         """
         # Store configuration values using attribute access
         self.primary_account_number = config.primary_account_number
@@ -183,9 +186,10 @@ class Importer(ClassifierMixin, CSVImporter):
         self.default_income = config.default_income_account
 
         # Store deduplication settings
-        self.dedup_window = datetime.timedelta(days=dedup_window_days)
-        self.dedup_max_date_delta = datetime.timedelta(days=dedup_max_date_delta)
-        self.dedup_epsilon = dedup_epsilon
+        self.dedup_window = datetime.timedelta(days=config.dedup_window_days)
+        self.dedup_max_date_delta = datetime.timedelta(days=config.dedup_max_date_delta)
+        self.dedup_epsilon = config.dedup_epsilon
+        self.debug = debug
 
         # Per-file occurrence counts backing import fingerprints; reset in extract()
         self._fingerprint_occurrences: Counter = Counter()
@@ -377,10 +381,15 @@ class Importer(ClassifierMixin, CSVImporter):
 class DepositAccountImporter(Importer):
     """Deprecated alias for Importer."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        config: Config,
+        flag: str = "*",
+        debug: bool = False,
+    ):
         warnings.warn(
             "DepositAccountImporter is deprecated; use Importer instead.",
             DeprecationWarning,
             stacklevel=2,
         )
-        super().__init__(*args, **kwargs)
+        super().__init__(config, flag=flag, debug=debug)

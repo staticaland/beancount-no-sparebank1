@@ -32,12 +32,20 @@ def test_pdf_statement_config_controls_balance_assertions() -> None:
     assert importer.extract("missing.pdf", []) == []
 
 
-def test_pdf_statement_importer_keeps_string_constructor_compatibility() -> None:
-    importer = StatementImporter("Assets:Bank:SpareBank1:Checking")
+def test_pdf_statement_importer_uses_config_dedup_tuning() -> None:
+    importer = StatementImporter(
+        StatementConfig(
+            account_name="Assets:Bank:SpareBank1:Checking",
+            dedup_window_days=7,
+            dedup_max_date_delta=4,
+            dedup_epsilon=D("0.10"),
+        )
+    )
 
     assert importer.account_name == "Assets:Bank:SpareBank1:Checking"
-    assert importer.currency == "NOK"
-    assert importer.generate_balance_assertions is True
+    assert importer.dedup_window.days == 7
+    assert importer.dedup_max_date_delta.days == 4
+    assert importer.dedup_epsilon == D("0.10")
 
 
 def test_balance_assertion_duplicates_match_on_account_and_date() -> None:

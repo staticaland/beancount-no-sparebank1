@@ -23,6 +23,9 @@ class StatementConfig:
     currency: str = "NOK"
     prefix: str = "bank"
     generate_balance_assertions: bool = True
+    dedup_window_days: int = 3
+    dedup_max_date_delta: int = 2
+    dedup_epsilon: Decimal = Decimal("0.05")
 
 
 class StatementImporter(Importer):
@@ -37,44 +40,28 @@ class StatementImporter(Importer):
 
     def __init__(
         self,
-        config: StatementConfig | str,
-        currency: str = "NOK",
-        prefix: str = "bank",
-        generate_balance_assertions: bool = True,
-        dedup_window_days: int = 3,
-        dedup_max_date_delta: int = 2,
-        dedup_epsilon: Decimal = Decimal("0.05"),
+        config: StatementConfig,
         flag: str = "*",
+        debug: bool = False,
     ):
         """
         Initialize a PDF statement importer.
 
         Args:
-            config: A StatementConfig object, or the Beancount account name
-                for backwards-compatible direct construction.
-            currency: The currency of the account when config is a string.
-            prefix: Prefix for generated filenames when config is a string.
-            generate_balance_assertions: Whether to emit balance assertions.
+            config: A StatementConfig object with account details.
             flag: Transaction flag (default: "*").
-            dedup_window_days: Days to look back for duplicates.
-            dedup_max_date_delta: Max days difference for duplicate detection.
-            dedup_epsilon: Tolerance for amount differences in duplicates.
+            debug: Enable debug output (default: False).
         """
-        if isinstance(config, StatementConfig):
-            self.account_name = config.account_name
-            self.currency = config.currency
-            self.prefix = config.prefix
-            self.generate_balance_assertions = config.generate_balance_assertions
-        else:
-            self.account_name = config
-            self.currency = currency
-            self.prefix = prefix
-            self.generate_balance_assertions = generate_balance_assertions
+        self.account_name = config.account_name
+        self.currency = config.currency
+        self.prefix = config.prefix
+        self.generate_balance_assertions = config.generate_balance_assertions
         self.flag = flag
+        self.debug = debug
 
-        self.dedup_window = datetime.timedelta(days=dedup_window_days)
-        self.dedup_max_date_delta = datetime.timedelta(days=dedup_max_date_delta)
-        self.dedup_epsilon = dedup_epsilon
+        self.dedup_window = datetime.timedelta(days=config.dedup_window_days)
+        self.dedup_max_date_delta = datetime.timedelta(days=config.dedup_max_date_delta)
+        self.dedup_epsilon = config.dedup_epsilon
         self.logger = logging.getLogger("StatementImporter")
 
 
@@ -316,10 +303,15 @@ class PDFStatementConfig(StatementConfig):
 class PDFStatementImporter(StatementImporter):
     """Deprecated alias for StatementImporter."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        config: StatementConfig,
+        flag: str = "*",
+        debug: bool = False,
+    ):
         warnings.warn(
             "PDFStatementImporter is deprecated; use StatementImporter instead.",
             DeprecationWarning,
             stacklevel=2,
         )
-        super().__init__(*args, **kwargs)
+        super().__init__(config, flag=flag, debug=debug)

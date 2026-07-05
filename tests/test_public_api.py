@@ -23,20 +23,34 @@ def test_canonical_importer_api():
         Config(
             primary_account_number="12345678901",
             account_name="Assets:Bank:SpareBank1:Checking",
-        )
+            dedup_window_days=7,
+        ),
+        flag="!",
+        debug=True,
     )
 
     assert importer.account_name == "Assets:Bank:SpareBank1:Checking"
+    assert importer.flag == "!"
+    assert importer.debug is True
+    assert importer.dedup_window.days == 7
 
 
 def test_canonical_statement_api():
     assert ModuleStatementConfig is StatementConfig
 
     importer = StatementImporter(
-        StatementConfig(account_name="Assets:Bank:SpareBank1:Checking")
+        StatementConfig(
+            account_name="Assets:Bank:SpareBank1:Checking",
+            dedup_window_days=7,
+        ),
+        flag="!",
+        debug=True,
     )
 
     assert importer.account_name == "Assets:Bank:SpareBank1:Checking"
+    assert importer.flag == "!"
+    assert importer.debug is True
+    assert importer.dedup_window.days == 7
 
 
 def test_deprecated_deposit_aliases_warn():
@@ -47,9 +61,11 @@ def test_deprecated_deposit_aliases_warn():
         )
 
     with pytest.warns(DeprecationWarning, match="DepositAccountImporter is deprecated"):
-        importer = DepositAccountImporter(config)
+        importer = DepositAccountImporter(config, flag="!", debug=True)
 
     assert isinstance(importer, Importer)
+    assert importer.flag == "!"
+    assert importer.debug is True
 
 
 def test_deprecated_statement_aliases_warn():
@@ -57,6 +73,8 @@ def test_deprecated_statement_aliases_warn():
         config = PDFStatementConfig(account_name="Assets:Bank:SpareBank1:Checking")
 
     with pytest.warns(DeprecationWarning, match="PDFStatementImporter is deprecated"):
-        importer = PDFStatementImporter(config)
+        importer = PDFStatementImporter(config, flag="!", debug=True)
 
     assert isinstance(importer, StatementImporter)
+    assert importer.flag == "!"
+    assert importer.debug is True

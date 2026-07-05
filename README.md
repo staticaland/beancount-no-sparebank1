@@ -288,6 +288,8 @@ Beancount checks balances at the start of the assertion date.
 ## Configuration Reference
 
 ```python
+from decimal import Decimal
+
 Config(
     # Required
     primary_account_number="12345678901",  # Your account number (for file matching)
@@ -307,6 +309,29 @@ Config(
     # Optional: fallback accounts for unmatched transactions
     default_expense_account="Expenses:Unknown",
     default_income_account="Income:Unknown",
+
+    # Optional: duplicate detection tuning
+    dedup_window_days=3,
+    dedup_max_date_delta=2,
+    dedup_epsilon=Decimal("0.05"),
+)
+```
+
+PDF statement importers use the same constructor shape:
+
+```python
+StatementImporter(
+    StatementConfig(
+        account_name="Assets:Bank:SpareBank1:Checking",
+        currency="NOK",
+        prefix="sparebank1_statement",
+        generate_balance_assertions=True,
+        dedup_window_days=3,
+        dedup_max_date_delta=2,
+        dedup_epsilon=Decimal("0.05"),
+    ),
+    flag="*",
+    debug=False,
 )
 ```
 
@@ -314,7 +339,7 @@ Config(
 
 -   Each CSV file should contain transactions from a single account
 -   The importer identifies files by checking if the primary account number appears in transactions
--   Duplicate detection uses date, amount, and narration similarity
+-   Duplicate detection prefers the generated import fingerprint and falls back to date, amount, and narration similarity for older entries without fingerprints
 -   PDF balance statement duplicate detection uses account and assertion date
 
 ## See also

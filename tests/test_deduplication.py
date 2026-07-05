@@ -5,8 +5,8 @@ from beancount.core.amount import Amount
 from beancount.core.number import D
 
 from beancount_no_sparebank1.deposit import (
-    Importer,
     Config,
+    Importer,
 )
 
 
@@ -16,6 +16,22 @@ def _importer() -> Importer:
         account_name="Assets:Bank:SpareBank1:Checking",
     )
     return Importer(config)
+
+
+def test_dedup_tuning_lives_in_config() -> None:
+    importer = Importer(
+        Config(
+            primary_account_number="12345678901",
+            account_name="Assets:Bank:SpareBank1:Checking",
+            dedup_window_days=7,
+            dedup_max_date_delta=4,
+            dedup_epsilon=D("0.10"),
+        )
+    )
+
+    assert importer.dedup_window.days == 7
+    assert importer.dedup_max_date_delta.days == 4
+    assert importer.dedup_epsilon == D("0.10")
 
 
 def _transaction(fingerprint: str | None, amount: str = "-100.00") -> data.Transaction:
@@ -44,8 +60,8 @@ def _transaction(fingerprint: str | None, amount: str = "-100.00") -> data.Trans
 
 
 def test_matching_fingerprint_marks_duplicate() -> None:
-    entries = [_transaction("same-fingerprint")]
-    existing = [_transaction("same-fingerprint")]
+    entries: list[data.Directive] = [_transaction("same-fingerprint")]
+    existing: list[data.Directive] = [_transaction("same-fingerprint")]
 
     _importer().deduplicate(entries, existing)
 
@@ -53,8 +69,8 @@ def test_matching_fingerprint_marks_duplicate() -> None:
 
 
 def test_different_fingerprints_prevent_fuzzy_false_positive() -> None:
-    entries = [_transaction("new-fingerprint")]
-    existing = [_transaction("existing-fingerprint")]
+    entries: list[data.Directive] = [_transaction("new-fingerprint")]
+    existing: list[data.Directive] = [_transaction("existing-fingerprint")]
 
     _importer().deduplicate(entries, existing)
 
@@ -62,8 +78,8 @@ def test_different_fingerprints_prevent_fuzzy_false_positive() -> None:
 
 
 def test_heuristic_fallback_handles_identityless_history() -> None:
-    entries = [_transaction("new-fingerprint")]
-    existing = [_transaction(None)]
+    entries: list[data.Directive] = [_transaction("new-fingerprint")]
+    existing: list[data.Directive] = [_transaction(None)]
 
     _importer().deduplicate(entries, existing)
 
