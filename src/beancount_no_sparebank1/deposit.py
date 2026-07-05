@@ -2,6 +2,7 @@ import csv
 import datetime
 import hashlib
 import itertools
+import warnings
 from collections import Counter
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -15,7 +16,7 @@ from beancount_classifier import (
     counterparty,
 )
 from beangulp import extract, similar, utils
-from beangulp.importers.csvbase import Column, CreditOrDebit, Date, Importer
+from beangulp.importers.csvbase import Column, CreditOrDebit, Date, Importer as CSVImporter
 
 DIALECT_NAME = "sparebank1"
 
@@ -36,7 +37,7 @@ def _entry_import_fingerprint(entry: data.Directive) -> str | None:
 
 
 @dataclass
-class Sparebank1AccountConfig:
+class Config:
     """Configuration for a SpareBank 1 account.
 
     Attributes:
@@ -66,7 +67,22 @@ class Sparebank1AccountConfig:
     default_income_account: Optional[str] = None
 
 
-class DepositAccountImporter(ClassifierMixin, Importer):
+Sparebank1Config = Config
+
+
+@dataclass
+class Sparebank1AccountConfig(Config):
+    """Deprecated alias for Config."""
+
+    def __post_init__(self) -> None:
+        warnings.warn(
+            "Sparebank1AccountConfig is deprecated; use Config or Sparebank1Config instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+
+class Importer(ClassifierMixin, CSVImporter):
     """
     Importer for SpareBank 1 deposit account CSV statements.
 
@@ -131,7 +147,7 @@ class DepositAccountImporter(ClassifierMixin, Importer):
 
     def __init__(
         self,
-        config: Sparebank1AccountConfig,
+        config: Config,
         dedup_window_days: int = 3,
         dedup_max_date_delta: int = 2,
         dedup_epsilon: Decimal = Decimal("0.05"),
@@ -141,7 +157,7 @@ class DepositAccountImporter(ClassifierMixin, Importer):
         Initialize a SpareBank 1 importer using a configuration object.
 
         Args:
-            config: A Sparebank1AccountConfig object with account details.
+            config: A Config object with account details.
             flag: Transaction flag (default: "*").
             dedup_window_days: Days to look back for duplicates.
             dedup_max_date_delta: Max days difference for duplicate detection.
@@ -178,6 +194,7 @@ class DepositAccountImporter(ClassifierMixin, Importer):
         super().__init__(account_name, self.currency, flag=flag)
         # Now store account_name on self as well, consistent with other attrs
         self.account_name = account_name
+
 
     def identify(self, filepath: str) -> bool:
         """
@@ -355,3 +372,15 @@ class DepositAccountImporter(ClassifierMixin, Importer):
             fields["to_account"] = to_account
 
         return fields if fields else None
+
+
+class DepositAccountImporter(Importer):
+    """Deprecated alias for Importer."""
+
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "DepositAccountImporter is deprecated; use Importer instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(*args, **kwargs)

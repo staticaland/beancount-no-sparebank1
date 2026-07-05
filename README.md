@@ -54,8 +54,8 @@ Create `src/finances/importers.py`:
 ```python
 from beangulp import Ingest
 from beancount_no_sparebank1 import (
-    DepositAccountImporter,
-    Sparebank1AccountConfig,
+    Importer,
+    Config,
     match,
     when,
     field,
@@ -66,7 +66,7 @@ from beancount_no_sparebank1 import (
 
 def get_importers():
     return [
-        DepositAccountImporter(Sparebank1AccountConfig(
+        Importer(Config(
             primary_account_number="12345678901",
             account_name="Assets:Bank:SpareBank1:Checking",
             currency="NOK",
@@ -269,11 +269,11 @@ The SpareBank 1 importer exposes these fields for matching:
 Extract balance assertions from PDF "kontoutskrift" statements:
 
 ```python
-from beancount_no_sparebank1 import PDFStatementConfig, PDFStatementImporter
+from beancount_no_sparebank1 import StatementConfig, StatementImporter
 
 importers = [
-    PDFStatementImporter(
-        PDFStatementConfig(
+    StatementImporter(
+        StatementConfig(
             account_name="Assets:Bank:SpareBank1:Checking",
             currency="NOK",
             generate_balance_assertions=True,
@@ -288,7 +288,7 @@ Beancount checks balances at the start of the assertion date.
 ## Configuration Reference
 
 ```python
-Sparebank1AccountConfig(
+Config(
     # Required
     primary_account_number="12345678901",  # Your account number (for file matching)
     account_name="Assets:Bank:SpareBank1:Checking",

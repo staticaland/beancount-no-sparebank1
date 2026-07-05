@@ -1,5 +1,16 @@
-from .deposit import DepositAccountImporter, Sparebank1AccountConfig  # NOQA
-from .balance import PDFStatementConfig, PDFStatementImporter  # NOQA
+from .importer import (  # NOQA
+    Config,
+    DepositAccountImporter,
+    Importer,
+    Sparebank1AccountConfig,
+    Sparebank1Config,
+)
+from .statement import (  # NOQA
+    PDFStatementConfig,
+    PDFStatementImporter,
+    StatementConfig,
+    StatementImporter,
+)
 
 # Re-export classifier utilities from beancount-classifier for convenience
 from beancount_classifier import (  # NOQA

@@ -1,6 +1,7 @@
 import datetime
 import logging
 import re
+import warnings
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -15,7 +16,7 @@ from beangulp.importer import Importer
 
 
 @dataclass
-class PDFStatementConfig:
+class StatementConfig:
     """Configuration for SpareBank 1 PDF balance statements."""
 
     account_name: str
@@ -24,7 +25,7 @@ class PDFStatementConfig:
     generate_balance_assertions: bool = True
 
 
-class PDFStatementImporter(Importer):
+class StatementImporter(Importer):
     """
     Importer for SpareBank 1 PDF bank statements.
     This importer processes PDF statements from SpareBank 1 in Norway,
@@ -36,7 +37,7 @@ class PDFStatementImporter(Importer):
 
     def __init__(
         self,
-        config: PDFStatementConfig | str,
+        config: StatementConfig | str,
         currency: str = "NOK",
         prefix: str = "bank",
         generate_balance_assertions: bool = True,
@@ -49,7 +50,7 @@ class PDFStatementImporter(Importer):
         Initialize a PDF statement importer.
 
         Args:
-            config: A PDFStatementConfig object, or the Beancount account name
+            config: A StatementConfig object, or the Beancount account name
                 for backwards-compatible direct construction.
             currency: The currency of the account when config is a string.
             prefix: Prefix for generated filenames when config is a string.
@@ -59,7 +60,7 @@ class PDFStatementImporter(Importer):
             dedup_max_date_delta: Max days difference for duplicate detection.
             dedup_epsilon: Tolerance for amount differences in duplicates.
         """
-        if isinstance(config, PDFStatementConfig):
+        if isinstance(config, StatementConfig):
             self.account_name = config.account_name
             self.currency = config.currency
             self.prefix = config.prefix
@@ -74,7 +75,8 @@ class PDFStatementImporter(Importer):
         self.dedup_window = datetime.timedelta(days=dedup_window_days)
         self.dedup_max_date_delta = datetime.timedelta(days=dedup_max_date_delta)
         self.dedup_epsilon = dedup_epsilon
-        self.logger = logging.getLogger("PDFStatementImporter")
+        self.logger = logging.getLogger("StatementImporter")
+
 
     def identify(self, filepath: str) -> bool:
         """
@@ -297,3 +299,27 @@ def same_balance_assertion(
         return False
 
     return entry1.date == entry2.date and entry1.account == entry2.account
+
+
+@dataclass
+class PDFStatementConfig(StatementConfig):
+    """Deprecated alias for StatementConfig."""
+
+    def __post_init__(self) -> None:
+        warnings.warn(
+            "PDFStatementConfig is deprecated; use StatementConfig instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+
+class PDFStatementImporter(StatementImporter):
+    """Deprecated alias for StatementImporter."""
+
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "PDFStatementImporter is deprecated; use StatementImporter instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(*args, **kwargs)

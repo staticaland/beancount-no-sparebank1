@@ -120,7 +120,7 @@ The mixin would need a way to extract fields from the row. Options:
 ```python
 from beancount_no_amex.classify import TransactionPattern
 
-config = Sparebank1AccountConfig(
+config = Config(
     transaction_patterns=[
         # Match by bank account number
         TransactionPattern(

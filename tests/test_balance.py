@@ -4,7 +4,7 @@ from beancount.core import data
 from beancount.core.amount import Amount
 from beancount.core.number import D
 
-from beancount_no_sparebank1 import PDFStatementConfig, PDFStatementImporter
+from beancount_no_sparebank1 import StatementConfig, StatementImporter
 from beancount_no_sparebank1.balance import same_balance_assertion
 
 
@@ -20,8 +20,8 @@ def balance(account: str, date: datetime.date, amount: str = "100.00") -> data.B
 
 
 def test_pdf_statement_config_controls_balance_assertions() -> None:
-    importer = PDFStatementImporter(
-        PDFStatementConfig(
+    importer = StatementImporter(
+        StatementConfig(
             account_name="Assets:Bank:SpareBank1:Checking",
             generate_balance_assertions=False,
         )
@@ -33,7 +33,7 @@ def test_pdf_statement_config_controls_balance_assertions() -> None:
 
 
 def test_pdf_statement_importer_keeps_string_constructor_compatibility() -> None:
-    importer = PDFStatementImporter("Assets:Bank:SpareBank1:Checking")
+    importer = StatementImporter("Assets:Bank:SpareBank1:Checking")
 
     assert importer.account_name == "Assets:Bank:SpareBank1:Checking"
     assert importer.currency == "NOK"

@@ -30,7 +30,7 @@ dev = [
     "ruff>=0.14.8",
 ]
 
-[tool.hatch.build]
+[tool.hatch.build.targets.wheel]
 packages = ["src/beancount_no_sparebank1"]
 
 [tool.hatch.version]

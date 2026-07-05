@@ -5,17 +5,17 @@ from beancount.core.amount import Amount
 from beancount.core.number import D
 
 from beancount_no_sparebank1.deposit import (
-    DepositAccountImporter,
-    Sparebank1AccountConfig,
+    Importer,
+    Config,
 )
 
 
-def _importer() -> DepositAccountImporter:
-    config = Sparebank1AccountConfig(
+def _importer() -> Importer:
+    config = Config(
         primary_account_number="12345678901",
         account_name="Assets:Bank:SpareBank1:Checking",
     )
-    return DepositAccountImporter(config)
+    return Importer(config)
 
 
 def _transaction(fingerprint: str | None, amount: str = "-100.00") -> data.Transaction:
