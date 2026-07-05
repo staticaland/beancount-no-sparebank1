@@ -210,9 +210,8 @@ class Importer(ClassifierMixin, CSVImporter):
         Returns:
             True if the file is a matching CSV for this specific account, False otherwise.
         """
-        # Basic checks: mimetype and header
-        if not utils.is_mimetype(filepath, "text/csv"):
-            return False
+        # Content-based checks: header and account rows. Do not use filename or
+        # mimetype guesses; both are derived from the name and reject renamed exports.
         if not utils.search_file_regexp(
             filepath,
             "Dato;Beskrivelse;Rentedato;Inn;Ut;Til konto;Fra konto",

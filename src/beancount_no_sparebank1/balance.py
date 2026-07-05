@@ -11,7 +11,7 @@ import pypdf
 from beancount.core import data
 from beancount.core.amount import Amount
 from beancount.core.number import D
-from beangulp import extract, utils
+from beangulp import extract
 from beangulp.importer import Importer
 
 
@@ -76,10 +76,9 @@ class StatementImporter(Importer):
             True if the file is a matching PDF, False otherwise.
         """
         path = Path(filepath)
-        if not utils.is_mimetype(path, "application/pdf"):
-            return False
 
-        # Check for Norwegian bank statement indicators
+        # Content-based check for Norwegian bank statement indicators. Do not
+        # use filename or mimetype guesses; both reject renamed exports.
         norwegian_patterns = [
             r"Kontoutskrift",
             r"Saldo.*favør",

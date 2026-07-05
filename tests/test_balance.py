@@ -60,6 +60,25 @@ def test_pdf_statement_filename_uses_provider_and_account_leaf(tmp_path) -> None
     assert importer.filename(str(statement)) == "sparebank1.Checking.statement.pdf"
 
 
+def test_pdf_statement_identify_accepts_renamed_pdf_content(tmp_path, monkeypatch) -> None:
+    class FakePage:
+        def extract_text(self):
+            return "Kontoutskrift for perioden 01.01.2025 - 31.01.2025"
+
+    class FakeReader:
+        def __init__(self, _file):
+            self.pages = [FakePage()]
+
+    monkeypatch.setattr("beancount_no_sparebank1.balance.pypdf.PdfReader", FakeReader)
+    importer = StatementImporter(
+        StatementConfig(account_name="Assets:Bank:SpareBank1:Checking")
+    )
+    statement = tmp_path / "renamed.txt"
+    statement.write_bytes(b"%PDF-1.7")
+
+    assert importer.identify(str(statement)) is True
+
+
 def test_balance_assertion_duplicates_match_on_account_and_date() -> None:
     first = balance("Assets:Bank:SpareBank1:Checking", datetime.date(2025, 2, 1), "10.00")
     same_identity = balance("Assets:Bank:SpareBank1:Checking", datetime.date(2025, 2, 1), "20.00")

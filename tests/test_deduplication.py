@@ -43,6 +43,28 @@ def test_csv_filename_uses_provider_and_account_leaf(tmp_path) -> None:
     assert _importer().filename(str(statement)) == "sparebank1.Checking.2025-01.csv"
 
 
+def test_identify_accepts_renamed_csv_when_content_matches(tmp_path) -> None:
+    statement = tmp_path / "renamed.txt"
+    statement.write_text(
+        "\ufeffDato;Beskrivelse;Rentedato;Inn;Ut;Til konto;Fra konto\n"
+        "01.01.2025;PAY;01.01.2025;;100,00;;12345678901\n",
+        encoding="utf-8",
+    )
+
+    assert _importer().identify(str(statement)) is True
+
+
+def test_identify_rejects_csv_for_other_account(tmp_path) -> None:
+    statement = tmp_path / "renamed.txt"
+    statement.write_text(
+        "\ufeffDato;Beskrivelse;Rentedato;Inn;Ut;Til konto;Fra konto\n"
+        "01.01.2025;PAY;01.01.2025;;100,00;;99999999999\n",
+        encoding="utf-8",
+    )
+
+    assert _importer().identify(str(statement)) is False
+
+
 def _transaction(fingerprint: str | None, amount: str = "-100.00") -> data.Transaction:
     meta = data.new_metadata("<test>", 1)
     if fingerprint is not None:
